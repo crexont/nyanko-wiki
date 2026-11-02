@@ -343,7 +343,8 @@ def main(argv: list[str] | None = None) -> None:
             "rarity": ub[13],
             "forms": forms,
             "maxLevel": ub[50] or ub[19],
-            "maxPlus": ub[51],
+            # 뽑기로 안 나오는 레어 이상 캐릭은 겹칠 수 없어 플러스 레벨이 없다 (51열에 70이 남아 있는 #53·#319)
+            "maxPlus": 0 if ub[12] == 0 and ub[13] >= 2 else ub[51],
             # 진화 아이템 ID가 0이면 해당 진화 없음. 요구 레벨: 25/26열(열매 진화), 없으면 20열(기본캐릭), 0=스테이지 해금 등
             "tfLevel": max(ub[25], ub[20], 0) if len(forms) >= 3 and ub[23] > 0 else None,
             "ffLevel": max(ub[26], 0) if len(forms) >= 4 and ub[24] > 0 else None,
