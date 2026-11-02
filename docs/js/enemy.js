@@ -35,7 +35,20 @@ export function enemyCycle(e) {
 }
 
 const TRAITS = ["빨강", "떠있음", "검정", "메탈", "무속성", "천사", "에이리언", "좀비", "고대종", "악마", "사도", "초생명체", "초수", "초현자", "괴인", "마녀"];
-const ui = { q: "", trait: new Set(), sort: "id", hidden: false };
+// 능력 필터: [키, 이름, 해당 여부]. 비슷한 능력은 하나로 묶는다 (파동 = 파동·소파동 등)
+const has = (...keys) => e => e.ab.some(a => keys.includes(a[0]));
+const ABIL = [
+  ["wave", "파동", has("wave", "miniWave")], ["surge", "열파", has("surge", "miniSurge", "deathSurge")],
+  ["shield", "쉴드", has("demonShield")], ["barrier", "베리어", has("barrierHp")], ["warp", "워프", has("warp")],
+  ["revive", "부활", has("revive")], ["burrow", "지하 이동", has("burrow")], ["toxic", "독", has("toxic")],
+  ["curse", "저주", has("curse")], ["dodge", "공격 무효", has("dodge")], ["freeze", "멈춤", has("freeze")],
+  ["slow", "느리게", has("slow")], ["kb", "날려버림", has("kb")], ["weaken", "공격력 다운", has("weaken")],
+  ["crit", "크리티컬", has("crit")], ["survive", "살아남기", has("survive")], ["strengthen", "공격력 업", has("strengthen")],
+  ["ld", "원거리", e => !!e.ld], ["area", "범위 공격", e => e.area],
+];
+const ui = { q: "", trait: new Set(), abil: new Set(), sort: "id", hidden: false };
+// 정렬 기준: DPS·공격력은 기본(100%) 배율, 공격 합계 기준
+const dpsOf = e => { const c = enemyCycle(e); return c ? e.atk.reduce((a, b) => a + b, 0) * 30 / c : 0; };
 
 export function renderEnemies(root) {
   root.innerHTML = `
@@ -46,9 +59,10 @@ export function renderEnemies(root) {
     <div class="filters">
       <div class="row">
         <input type="search" id="eQ" placeholder="이름 또는 번호 검색" value="${esc(ui.q)}">
-        <select id="eSort" aria-label="정렬"><option value="id">번호순</option><option value="hp">체력순</option><option value="range">사거리순</option><option value="name">이름순</option></select>
+        <select id="eSort" aria-label="정렬"><option value="id">번호순</option><option value="hp">체력순</option><option value="atk">공격력순</option><option value="dps">DPS순</option><option value="range">사거리순</option><option value="speed">이동속도순</option><option value="name">이름순</option></select>
       </div>
       <div class="row" id="eTrait"><span class="lbl">속성</span></div>
+      <div class="row" id="eAbil"><span class="lbl">능력</span></div>
       <div class="row"><label class="check"><input type="checkbox" id="eHidden"${ui.hidden ? " checked" : ""}> 이름 없는 적도 보기 <small>(도감에 안 나오는 콜라보·특수 적)</small></label></div>
     </div>
     <p class="count" id="eCount"></p>
@@ -59,6 +73,7 @@ export function renderEnemies(root) {
     const draw = () => drawList(list);
     const filters = () => {
       chips(root.querySelector("#eTrait"), TRAITS.map(t => [t, t]), v => ui.trait.has(v), v => { toggle(ui.trait, v); filters(); draw(); });
+      chips(root.querySelector("#eAbil"), ABIL.map(([k, n]) => [k, n]), v => ui.abil.has(v), v => { toggle(ui.abil, v); filters(); draw(); });
     };
     root.querySelector("#eQ").oninput = e => { ui.q = e.target.value.trim(); draw(); };
     root.querySelector("#eSort").onchange = e => { ui.sort = e.target.value; draw(); };
@@ -74,10 +89,14 @@ function drawList(all) {
   const list = all.filter(e => {
     if (e.hidden && !ui.hidden) return false;
     for (const t of ui.trait) if (!e.traits.includes(t)) return false;
+    for (const k of ui.abil) if (!ABIL.find(x => x[0] === k)[2](e)) return false;
     return !q || e.name.toLowerCase().includes(q) || String(e.id) === q;
   });
   if (ui.sort === "hp") list.sort((a, b) => b.hp - a.hp);
   if (ui.sort === "range") list.sort((a, b) => b.range - a.range);
+  if (ui.sort === "atk") list.sort((a, b) => b.atk.reduce((x, y) => x + y, 0) - a.atk.reduce((x, y) => x + y, 0));
+  if (ui.sort === "dps") list.sort((a, b) => dpsOf(b) - dpsOf(a));
+  if (ui.sort === "speed") list.sort((a, b) => b.speed - a.speed);
   if (ui.sort === "name") list.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   document.getElementById("eCount").textContent = `${list.length}종`;
   grid.innerHTML = list.length ? list.map(e => `<a class="mcard" href="#/enemy/${e.id}">

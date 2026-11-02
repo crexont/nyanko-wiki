@@ -397,7 +397,9 @@ function paint(root, c, u) {
           <dt>레어도</dt><dd>${rarBadge(c)}</dd>
           <dt>최대 레벨</dt><dd>${c.maxLevel}${c.maxPlus ? ` + ${c.maxPlus}` : ""}</dd>
           <dt>진화 단계</dt><dd>${c.forms.length}단계</dd>
-        </dl></div>
+        </dl>
+        <!-- 냥코DB(battlecats-db.com) 캐릭 번호 = ID + 1 -->
+        <p style="margin:12px 0 0"><a class="btn" href="https://battlecats-db.com/unit/${String(c.id + 1).padStart(3, "0")}.html" target="_blank" rel="noopener">냥코DB에서 보기 ↗</a></p></div>
       </div>
     </div>`;
 

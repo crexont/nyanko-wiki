@@ -52,6 +52,9 @@ main{flex:1;padding:28px 0 40px}
 .hero h1{font-size:44px;font-weight:800;letter-spacing:-.03em;margin:0 0 18px;line-height:1.15}
 .hero p{margin:0 0 6px;color:var(--ink);opacity:.85;font-size:16px}
 .hero .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+/* 오른쪽 캐릭 그림과 겹치지 않게: 글·버튼 칸 폭 제한 (900px 이하에선 그림이 숨어서 해제) */
+.hero>div:first-child{max-width:calc(100% - 360px)}
+.hero .acts .btn.big:not(.primary){min-width:130px}
 .hero-art{position:absolute;right:40px;top:50%;transform:translateY(-50%);display:grid;grid-template-columns:repeat(3,96px);gap:10px;opacity:.9;pointer-events:none}
 .hero-art img{width:96px;height:74px;object-fit:contain}
 .hero-art::before{content:"";position:absolute;inset:-60px;border-radius:50%;border:1px solid color-mix(in srgb,var(--accent) 25%,transparent)}
@@ -423,6 +426,7 @@ fieldset:disabled{opacity:.45}
 @media (max-width:900px){
   .cols{grid-template-columns:minmax(0,1fr)}
   .hero-art{display:none}
+  .hero>div:first-child{max-width:none}
   .hero{padding:36px 26px;min-height:0}
   .hero h1{font-size:34px}
 }

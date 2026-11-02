@@ -36,6 +36,8 @@ function renderHome(root) {
           <a class="btn primary big" href="#/cats">캐릭터 찾아보기 <span aria-hidden="true">↗</span></a>
           <a class="btn big" href="#/dex">내 도감 <span aria-hidden="true">↗</span></a>
           <a class="btn big" href="#/plan">육성 <span aria-hidden="true">↗</span></a>
+          <a class="btn big" href="#/enemies">적 <span aria-hidden="true">↗</span></a>
+          <a class="btn big" href="#/stages">스테이지 <span aria-hidden="true">↗</span></a>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">${art}</div>
