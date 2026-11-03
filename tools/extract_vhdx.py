@@ -5,7 +5,7 @@
 - 7-Zip(7z.exe) 필요
 
 사용: python tools/extract_vhdx.py [--instance Pie64] [-o device] [--with-packs]
-  --with-packs: 사이트 아이콘을 다시 만들 때(build_gamedata.py) 필요한 *UnitServer 팩과 APK의 UnitLocal 팩도 꺼낸다
+  --with-packs: 사이트 데이터를 다시 만들 때 필요한 *UnitServer 팩과 APK의 UnitLocal·DataLocal·resLocal 팩도 꺼낸다
 """
 from __future__ import annotations
 
@@ -97,7 +97,10 @@ def extract_apk_icons(sz: str, vhdx: str, out: str) -> None:
             return
         subprocess.run([sz, "e", apk, f"-o{out}", "-y", "assets/UnitLocal.list", "assets/UnitLocal.pack",
                         "assets/ImageDataLocal.list", "assets/ImageDataLocal.pack",
-                        "assets/ImageLocal.list", "assets/ImageLocal.pack"],
+                        "assets/ImageLocal.list", "assets/ImageLocal.pack",
+                        # 게임 데이터 CSV (unpack_gamedata.py 가 bcsfe 게임 데이터 폴더로 푼다)
+                        "assets/DataLocal.list", "assets/DataLocal.pack",
+                        "assets/resLocal.list", "assets/resLocal.pack"],
                        capture_output=True, check=True)
 
 

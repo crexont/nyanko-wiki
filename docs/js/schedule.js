@@ -66,7 +66,7 @@ export function renderSchedule(root) {
     <div class="filters"><div class="row" id="scTabs"></div></div>
     <p class="meta" id="scMeta"></p>
     <div id="scBody"><div class="empty">불러오는 중…</div></div>`;
-  Promise.all([loadSchedule(), loadIndex(), loadSets().catch(() => [])]).then(([data, idx, sets]) => {
+  Promise.all([loadSchedule(), loadIndex(), loadSets().catch(() => ({ sets: [], pick: {} }))]).then(([data, idx, sets]) => {
     const maps = new Map(idx.categories.flatMap(c => c.maps.map(([mid, name]) => [mid, { name, cat: c.name }])));
     const fetched = Date.parse(data.fetchedAt);
     const mins = Math.max(0, Math.round((Date.now() - fetched) / 6e4));
@@ -110,16 +110,19 @@ function gatyaPanel(list, sets, data) {
   const builtFor = gameVer(GD.builtFor || GD.version);
   return `<div class="panel"><h2>뽑기 <span class="ctl">${rows.length}개</span></h2><div class="sc-list">${rows.map(e => {
     // 레어 뽑기 세트의 캐릭: 우리 데이터보다 새 버전 이벤트면 세트 내용이 아직 비어 있을 수 있어서 안 보여준다
-    const ids = e.kind === "rare" && e.minVer <= builtFor ? sets[e.set.id] || [] : [];
-    const cats = ids.map(id => BYID.get(id)).filter(Boolean);
+    // 대표 캐릭(배너 옵션의 CharaID)을 맨 앞에. 콜라보 캐릭은 세트 목록에 없고 대표 캐릭으로만 나오기도 한다
+    const ok = e.kind === "rare" && e.minVer <= builtFor;
+    const feat = ok ? BYID.get(sets.pick[e.set.id]) : null;
+    const cats = (ok ? sets.sets[e.set.id] || [] : []).map(id => BYID.get(id)).filter(c => c && c !== feat);
     const top = cats.filter(c => c.rarity >= 4);
-    const show = (top.length ? top : cats).slice(0, 14);
-    const more = (top.length ? top : cats).length - show.length;
+    const pool = [...(feat ? [feat] : []), ...(top.length ? top : cats)];
+    const show = pool.slice(0, 14);
+    const more = pool.length - show.length;
     return `<div class="sc-item">
       <div class="sc-when">${period(e)}</div>
       <div class="sc-main"><b>${GATYA_KIND[e.kind] || "뽑기"}</b> <small>세트 ${e.set.id}</small>
         ${e.set.msg ? `<p>${esc(cleanMsg(e.set.msg))}</p>` : ""}
-        ${show.length ? `<div class="sc-cats">${show.map(c => `<a href="#/cat/${c.id}" title="${esc(c.forms[0].name)}">${icon(c, 0)}</a>`).join("")}${more > 0 ? `<span>외 ${more}</span>` : ""}</div>` : ""}
+        ${show.length ? `<div class="sc-cats">${show.map(c => `<a href="#/cat/${c.id}" title="${esc(c.forms[0].name)}"${c === feat ? ' class="feat"' : ""}>${icon(c, 0)}</a>`).join("")}${more > 0 ? `<span>외 ${more}</span>` : ""}</div>` : ""}
         ${e.kind === "rare" && e.minVer > builtFor ? `<small class="sc-note">게임 v${Math.floor(e.minVer / 10000)}.${Math.floor(e.minVer / 100) % 100} 새 뽑기라 캐릭 목록은 사이트 데이터 업데이트 뒤에 보여요.</small>` : ""}
       </div></div>`;
   }).join("")}</div></div>`;

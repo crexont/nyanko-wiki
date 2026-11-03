@@ -513,4 +513,5 @@ fieldset:disabled{opacity:.45}
 .sc-cats{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;align-items:center}
 .sc-cats img,.sc-cats .ph{width:52px;height:40px;object-fit:contain}
 .sc-cats span{font-size:12px;color:var(--muted);margin-left:4px}
+.sc-cats a.feat{border:var(--bw) solid var(--accent);border-radius:8px;background:var(--accent-soft)}
 @media (max-width:640px){.sc-item{grid-template-columns:1fr}.sc-when{flex-direction:row;flex-wrap:wrap;align-items:center}}
