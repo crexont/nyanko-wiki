@@ -4,7 +4,7 @@ name: schedule
 # 계정 정보는 시크릿 NYANKO_READER (tools/schedule.py --init 이 만든 일정 읽기 전용 계정)
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "7,37 * * * *"  # 정각 근처는 혼잡해 예약이 밀리거나 빠짐, 30분마다 다시 시도
   workflow_dispatch:
 
 permissions:
