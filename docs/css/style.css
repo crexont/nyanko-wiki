@@ -294,6 +294,10 @@ dialog.choose small{color:var(--muted)}
 .counter-list{display:flex;flex-direction:column;gap:4px}
 .counter-list a{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-size:13.5px}
 .counter-list small{display:block;color:var(--muted);font-size:12px}
+.counter-more{margin-top:12px}
+.counter-more summary{cursor:pointer;font-size:13px;font-weight:600;margin-bottom:8px;width:max-content}
+.counter-more summary:hover{color:var(--accent)}
+#eCounter .sum-title{margin-top:4px}
 @media (max-width:640px){.sum-table th,.sum-table td{padding:6px 4px}.item-cell{white-space:normal}.stage-row .ens{display:none}.rb{grid-template-columns:110px 1fr}}
 .mcard .owned-dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
 

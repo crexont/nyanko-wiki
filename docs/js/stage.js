@@ -21,6 +21,19 @@ const LATE_F = 27000;
 const sec = f => { const s = (f / 30).toFixed(2).replace(/\.?0+$/, ""); return `${s}초`; };
 const num = n => Math.floor(n).toLocaleString();
 const failed = (root, what) => { root.innerHTML = `<div class="empty">${what} 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; };
+// 냥코DB(일본판) 스테이지 주소: s{맵번호÷1000 (2자리)}{맵번호%1000 (3자리)}-{스테이지+1 (2자리)}.
+// 좀비 습격은 메인 스토리 번호 + z (미래편 1장 = 03003z). 세계편·세계편 좀비는 한국판 전용 지도라 없다.
+// 개다래·엑스트라와 아래 맵들은 2026-11-03 냥코DB 스테이지 목록에 없던 것 (한국판 전용·옛 버전)
+const NO_DB = new Set([1037, 1071, 1139, 1144, 1224, 1225, 1267, 1293, 1310, 1311, 2079, 2105, 2130, 2131, 2212, 2213, 2214, 2215,
+  24068, 27006, 27016, 25000, 25036, 25037, 25038, 25039, 25040, 25041, 25042, 25043, 25044, 25045, 25046, 25047, 25048, 25049,
+  25050, 25055, 25067, 25068, 25069, 11010, 3000, 3001, 3002, 20000, 20001, 20002, 22001, 22002, 23000]);
+function dbStageUrl(mid, si) {
+  const code = codeOf(mid);
+  if (NO_DB.has(mid) || code === "B" || code === "RE") return null;
+  const map = code === "Z" ? `03${String(3 + (Math.floor(mid / 1000) - 21) * 3 + mid % 1000).padStart(3, "0")}z`
+    : String(Math.floor(mid / 1000)).padStart(2, "0") + String(mid % 1000).padStart(3, "0");
+  return `https://battlecats-db.com/stage/s${map}-${String(si + 1).padStart(2, "0")}.html`;
+}
 const itemName = (idx, id) => idx.items[id] ?? GD.items?.[id] ?? `아이템 ${id}`;
 
 // 드롭 보상 한 칸: 아이템(번호 < 1000) 또는 캐릭(1000 이상: 번호 − 1000 / 10000 이상: 번호 − 10000)
@@ -186,7 +199,7 @@ function paint(root, idx, mid, m, s, byId) {
           ${s.time ? `<dt>제한 시간</dt><dd>${s.time}분</dd>` : ""}
           ${s.nc ? `<dt>이어하기</dt><dd>불가</dd>` : ""}
           ${s.bg ? `<dt>보스 가드</dt><dd>있음 (보스가 있으면 성을 칠 수 없음)</dd>` : ""}
-        </dl></div>
+        </dl>${dbStageUrl(mid, s.i) ? `<p style="margin:12px 0 0"><a class="btn" href="${dbStageUrl(mid, s.i)}" target="_blank" rel="noopener">냥코DB에서 보기 ↗</a></p>` : ""}</div>
         ${s.drop?.length ? `<div class="panel"><h2>드롭 보상</h2><div class="rewards">${s.drop.map(d => rewardHtml(idx, d, s.dropAll)).join("")}</div>
           ${s.dropOnce ? `<p class="note">첫 번째 보상은 처음 한 번만 얻을 수 있어요.</p>` : ""}</div>` : ""}
         ${traits.length ? `<div class="panel"><h2>적 속성</h2>${traitChips(traits)}<div id="counters"></div></div>` : ""}

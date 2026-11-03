@@ -1,6 +1,6 @@
 // 적 — 적 목록과 적 상세 (docs/data/enemies.json, 처음 열 때 한 번 받는다)
-import { esc, clamp, traitChips, chips, toggle } from "./common.js";
-import { abilityText } from "./cat.js";
+import { GD, esc, clamp, traitChips, chips, toggle, store, FORM } from "./common.js";
+import { abilityText, loadUnits } from "./cat.js";
 
 let enemiesPromise;
 export const loadEnemies = () => enemiesPromise ??= fetch("data/enemies.json").then(r => {
@@ -188,14 +188,74 @@ function paint(root, e) {
           ${e.star ? `<dt>별 에이리언</dt><dd>보물 효과를 덜 받는 에이리언</dd>` : ""}
         </dl>
         <p style="margin:12px 0 0"><a class="btn" href="${dbEnemyUrl(e.id)}" target="_blank" rel="noopener">냥코DB에서 보기 ↗</a></p></div>
+        <div class="panel" id="eCounter" hidden></div>
       </div>
     </div>`;
   document.title = `${e.name} - 냥코위키`;
   paintAppear(root, e);
+  paintCounter(root, e);
   for (const k of ["hpPct", "atkPct"]) {
     const inp = root.querySelector("#" + k);
     inp.onchange = () => { state[k] = clamp(parseInt(inp.value) || 100, 1, 100000); paint(root, e); root.querySelector("#" + k).focus(); };
   }
+}
+
+// 상대하는 캐릭: 적 속성을 타겟으로 엄청 강하다·초 데미지·초극 데미지·맷집·초 맷집을 가진 캐릭.
+// 본능(3진부터)으로 생기는 속성·능력도 넣고 "본능"으로 표시한다. 타겟 한정만 있는 캐릭은 뺀다
+const COUNTER = [["insane", "초극뎀"], ["massive", "초뎀"], ["tough", "초맷집"], ["strong", "엄강"], ["resist", "맷집"]];
+const TAL_COUNTER = { 5: "strong", 6: "resist", 7: "massive" };  // 본능 ID → 능력 (cat.js TAL_FLAG)
+
+// 진화 단계 fi에서 이 속성들에 쓸 수 있는 능력. 본능 없이 되면 tal = false
+function counterAt(c, u, fi, traits) {
+  const base = (t, ab) => {
+    const hit = t.filter(x => traits.includes(x)), keys = COUNTER.filter(([k]) => ab.includes(k));
+    return hit.length && keys.length ? { hit, keys } : null;
+  };
+  const ab = u.forms[fi]?.ab.map(a => a[0]) ?? [], t = c.forms[fi].traits;
+  const plain = base(t, ab);
+  if (plain || fi < 2 || !c.talents.length) return plain && { ...plain, tal: false };
+  const withTal = base([...t, ...c.talents.map(x => x.trait).filter(Boolean)],
+                       [...ab, ...c.talents.map(x => TAL_COUNTER[x.id]).filter(Boolean)]);
+  return withTal && { ...withTal, tal: true };
+}
+
+function paintCounter(root, e) {
+  const traits = e.traits.filter(t => GD.traits.includes(t));
+  const box = root.querySelector("#eCounter");
+  if (!box || !traits.length) return;
+  loadUnits().then(units => {
+    if (!root.contains(box)) return;
+    const list = [];
+    for (const c of GD.cats) {
+      const u = units[c.id]; if (!u) continue;
+      const o = store.owned(c.id), top = c.forms.length - 1;
+      const at = c.forms.map((_, fi) => counterAt(c, u, fi, traits));
+      const first = at.findIndex(Boolean); if (first < 0) continue;
+      // 보유 캐릭은 지금 진화 단계, 아니면 가장 높은 단계 기준
+      const cur = o ? Math.min(o.form, top) : top;
+      const fi = at[cur] ? cur : at.map(Boolean).lastIndexOf(true);
+      const x = at[fi];
+      list.push({ c, fi, owned: !!o, need: o && !at[cur] ? first : null, rank: COUNTER.indexOf(x.keys[0]), ...x });
+    }
+    list.sort((a, b) => a.rank - b.rank || a.c.id - b.c.id);
+    const mine = list.filter(x => x.owned), rest = list.filter(x => !x.owned);
+    const iconOf = (c, fi) => { for (let f = fi; f >= 0; f--) if (c.forms[f].icon) return `icons/${c.id}_${f}.png`; return null; };
+    const row = x => {
+      const src = iconOf(x.c, x.fi);
+      const tags = [x.hit.join("·"), x.keys.map(k => k[1]).join("·"), x.tal && "본능", x.need != null && `${FORM[x.need]}부터`].filter(Boolean);
+      return `<a href="#/cat/${x.c.id}">${src ? `<img class="eicon sm cat" src="${src}" alt="" loading="lazy">` : `<span class="eicon sm ph">#</span>`}
+        <span>${esc(x.c.forms[x.fi].name)}<small>${esc(tags.join(" · "))}</small></span></a>`;
+    };
+    const hasDex = Object.keys(store.data?.cats || {}).length > 0;
+    box.hidden = false;
+    box.innerHTML = list.length ? `<h2>상대하는 캐릭 <span class="ctl">${list.length}마리</span></h2>
+      ${hasDex ? `<h3 class="sum-title">내 캐릭 <small>${mine.length}마리</small></h3>
+        ${mine.length ? `<div class="counter-list">${mine.map(row).join("")}</div>` : `<p class="note" style="margin:0">내 도감 캐릭 중에는 없어요.</p>`}` : ""}
+      ${rest.length ? `<details class="counter-more"${hasDex ? "" : " open"}><summary>${hasDex ? `보유하지 않은 캐릭 ${rest.length}마리` : `전체 ${rest.length}마리`}</summary>
+        <div class="counter-list">${rest.map(row).join("")}</div></details>` : ""}
+      <p class="note">${traits.join("·")} 속성을 타겟으로 엄청 강하다·초 데미지·초극 데미지·맷집이 좋다·초 맷집 중 하나라도 가진 캐릭이에요. 강한 능력 순서. "본능"은 본능을 찍어야 생기는 경우, "N진부터"는 내 캐릭이 아직 그 단계가 아닌 경우예요.${hasDex ? "" : ` <a href="#/dex">내 도감</a>을 채우면 보유 캐릭을 먼저 보여줘요.`}</p>`
+      : `<h2>상대하는 캐릭</h2><p class="note" style="margin:0">${traits.join("·")} 속성을 타겟으로 하는 캐릭이 없어요.</p>`;
+  }).catch(() => {});
 }
 
 // 등장 스테이지: 맵마다 몇 번째 스테이지에 나오는지 (분류 순서대로)

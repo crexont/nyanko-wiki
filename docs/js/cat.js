@@ -4,7 +4,7 @@ import { openEdit } from "./edit.js";
 import { addToPlan, removeFromPlan, inPlan } from "./plan.js";
 
 let unitsPromise;
-const loadUnits = () => unitsPromise ??= fetch("data/units.json").then(r => {
+export const loadUnits = () => unitsPromise ??= fetch("data/units.json").then(r => {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 });
