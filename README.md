@@ -2,10 +2,10 @@
 
 # 냥코위키
 
-**냥코대전쟁(한국판) 캐릭터·적·스테이지 데이터와 내 육성 현황을 한눈에**
+**냥코대전쟁(한국판) 캐릭터·적·스테이지 데이터, 이벤트 일정, 내 육성 현황을 한눈에**
 
 [![사이트](https://img.shields.io/badge/냥코위키-바로가기-e0752d?style=for-the-badge)](https://crexont.github.io/nyanko-wiki/)
-[![버전](https://img.shields.io/badge/version-v4.0-1f1d1a?style=for-the-badge)](../../releases/latest)
+[![버전](https://img.shields.io/badge/version-v5.0-1f1d1a?style=for-the-badge)](../../releases/latest)
 [![추출 도구](https://img.shields.io/badge/추출%20도구-다운로드-2f8a4e?style=for-the-badge)](../../releases/latest)
 
 <img src="images/v5.0-home.png" alt="냥코위키 홈 화면" width="860">
