@@ -18,15 +18,8 @@ DEFAULT_SAVE = os.path.join(ROOT, "device", "SAVE_DATA")
 DEFAULT_OUT = os.path.join(ROOT, "냥코_세이브.json")
 
 
-def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("save", nargs="?", default=DEFAULT_SAVE)
-    ap.add_argument("-o", "--out", default=DEFAULT_OUT)
-    args = ap.parse_args(argv)
-    use_local_bcsfe_dir()
-
-    with open(args.save, "rb") as f:
-        raw = f.read()
+def export(raw: bytes, source: str, modified: str) -> dict:
+    """세이브 바이트 → 사이트에서 불러오는 JSON (dict). 세이브는 읽기만 한다."""
     s = core.SaveFile(core.Data(raw), core.CountryCode.from_code("kr"))
 
     cats = []
@@ -41,9 +34,9 @@ def main(argv: list[str] | None = None) -> None:
             "talents": {str(t.id): t.level for t in (c.talents or [])},
         })
 
-    out = {
-        "source": os.path.basename(args.save),
-        "saveModified": datetime.datetime.fromtimestamp(os.path.getmtime(args.save)).isoformat(timespec="minutes"),
+    return {
+        "source": source,
+        "saveModified": modified,
         "exportedAt": datetime.datetime.now().isoformat(timespec="minutes"),
         "gameVersion": s.game_version.to_string(),
         "catfood": s.catfood,
@@ -58,14 +51,30 @@ def main(argv: list[str] | None = None) -> None:
         "orbs": {str(i): o.value for i, o in s.talent_orbs.orbs.items()},
         "cats": cats,
     }
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=1)
 
+
+def write(out: dict, path: str) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    cats = out["cats"]
     forms = [sum(1 for c in cats if c["form"] == i) for i in range(4)]
-    print(f"{out['source']} (v{out['gameVersion']}) → {args.out}")
+    print(f"{out['source']} (v{out['gameVersion']}) → {path}")
     print(f"보유 {len(cats)}마리 (1진 {forms[0]} / 2진 {forms[1]} / 3진 {forms[2]} / 4진 {forms[3]}), "
-          f"통조림 {s.catfood}, XP {s.xp}")
+          f"통조림 {out['catfood']}, XP {out['xp']}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("save", nargs="?", default=DEFAULT_SAVE)
+    ap.add_argument("-o", "--out", default=DEFAULT_OUT)
+    args = ap.parse_args(argv)
+    use_local_bcsfe_dir()
+
+    with open(args.save, "rb") as f:
+        raw = f.read()
+    modified = datetime.datetime.fromtimestamp(os.path.getmtime(args.save)).isoformat(timespec="minutes")
+    write(export(raw, os.path.basename(args.save), modified), args.out)
 
 
 if __name__ == "__main__":
