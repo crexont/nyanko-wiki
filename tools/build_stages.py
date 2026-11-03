@@ -43,7 +43,7 @@ CATEGORIES = [
 ]
 # 일본어(가나·한자)가 남은 이름 = 한국판 미출시. "(旧)"는 한국판 이름에도 붙어서 먼저 바꾼다
 # 분류 파일이 아닌 출력 (역색인·목록)
-SKIP_FILES = ("index.json", "enemy_stages.json", "cat_drops.json", "item_drops.json")
+SKIP_FILES = ("index.json", "enemy_stages.json", "cat_drops.json", "item_drops.json", "stage_names.json")
 KANA = re.compile(r"[ぁ-ゖァ-ヺ一-鿿]")
 OLD = "(旧)"
 
@@ -295,6 +295,15 @@ def main(argv: list[str] | None = None) -> None:
         with open(os.path.join(out_dir, f"{code}.json"), "w", encoding="utf-8") as f:
             json.dump(cat_out, f, ensure_ascii=False, separators=(",", ":"))
         index.append({"code": code, "name": title, "maps": maps})
+
+    # 스테이지 이름 검색용: {맵 번호: [[스테이지 번호, 이름], ...]} (스테이지 목록 페이지에서 검색할 때만 받는다)
+    names_out: dict[int, list] = {}
+    for f in os.listdir(out_dir):
+        if f.endswith(".json") and f not in SKIP_FILES:
+            for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
+                names_out[int(mid)] = [[st["i"], st["n"]] for st in m["stages"]]
+    with open(os.path.join(out_dir, "stage_names.json"), "w", encoding="utf-8") as f:
+        json.dump(names_out, f, ensure_ascii=False, separators=(",", ":"))
 
     # 적 → 등장 스테이지 (적 상세 페이지용): {적 ID: [[맵 번호, [스테이지 번호, ...]], ...]}
     appear: dict[int, dict[int, list[int]]] = {}

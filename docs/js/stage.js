@@ -5,6 +5,8 @@ import { loadEnemies, enemyIcon, enemyHp, enemyAtk, enemyCycle } from "./enemy.j
 let indexPromise;
 const catPromises = {};
 const loadIndex = () => indexPromise ??= fetch("data/stages/index.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+let namesPromise;
+const loadNames = () => namesPromise ??= fetch("data/stages/stage_names.json").then(r => r.json());
 const loadCat = code => catPromises[code] ??= fetch(`data/stages/${code}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 let unitsPromise;
 const loadUnits = () => unitsPromise ??= fetch("data/units.json").then(r => r.json());
@@ -47,7 +49,7 @@ export function renderStages(root) {
   root.innerHTML = `
     <p class="crumb"><a href="#/">냥코위키</a><i>/</i><span>스테이지</span></p>
     <div class="page-head"><div><h1>스테이지</h1><p>레전드·이벤트·콜라보 등 스테이지별 출현 적, 배율, 드롭 보상. 내 캐릭과 적 사거리도 비교할 수 있어요.</p></div></div>
-    <div class="filters"><div class="row"><input type="search" id="sQ" placeholder="맵 이름 검색 (전체 분류에서)" value="${esc(ui.q)}"></div>
+    <div class="filters"><div class="row"><input type="search" id="sQ" placeholder="맵·스테이지 이름 검색 (전체 분류에서)" value="${esc(ui.q)}"></div>
       <div class="row" id="sCats"></div></div>
     <div id="sMaps"><div class="empty">불러오는 중…</div></div>`;
   loadIndex().then(idx => {
@@ -57,10 +59,27 @@ export function renderStages(root) {
       const q = ui.q.toLowerCase();
       const groups = q ? idx.categories.map(c => [c, c.maps.filter(m => m[1].toLowerCase().includes(q))]).filter(([, m]) => m.length)
         : idx.categories.filter(c => c.code === ui.code).map(c => [c, c.maps]);
-      root.querySelector("#sMaps").innerHTML = groups.length ? groups.map(([c, maps]) => `
+      const mapHtml = groups.map(([c, maps]) => `
         <div class="panel"><h2>${esc(c.name)} <span class="ctl">${maps.length}개 맵</span></h2>
-          <div class="map-list">${maps.map(([mid, name, n]) => `<a href="#/stage/${mid}"><span>${esc(name)}</span><small>${n}스테이지</small></a>`).join("")}</div></div>`).join("")
-        : `<div class="empty">"${esc(ui.q)}"에 맞는 맵이 없어요.</div>`;
+          <div class="map-list">${maps.map(([mid, name, n]) => `<a href="#/stage/${mid}"><span>${esc(name)}</span><small>${n}스테이지</small></a>`).join("")}</div></div>`).join("");
+      root.querySelector("#sMaps").innerHTML = q ? `<div id="sStageHits"></div>${mapHtml}` : mapHtml;
+      if (q) {
+        // 스테이지 이름: 검색할 때만 이름 목록을 받는다
+        loadNames().then(names => {
+          if (ui.q.toLowerCase() !== q) return;
+          const where = new Map(idx.categories.flatMap(c => c.maps.map(([mid, n]) => [mid, { c: c.name, n }])));
+          const hits = [];
+          for (const [mid, list] of Object.entries(names)) {
+            const w = where.get(+mid); if (!w) continue;
+            for (const [si, sn] of list) if (sn.toLowerCase().includes(q)) hits.push({ mid: +mid, si, sn, ...w });
+          }
+          const LIMIT = 60;
+          const box = root.querySelector("#sStageHits");
+          if (box) box.innerHTML = hits.length ? `<div class="panel"><h2>스테이지 <span class="ctl">${hits.length}개${hits.length > LIMIT ? ` 중 ${LIMIT}개` : ""}</span></h2>
+            <div class="map-list">${hits.slice(0, LIMIT).map(h => `<a href="#/stage/${h.mid}/${h.si}"><span>${esc(h.sn)}<small class="sub-map">${esc(h.c)} · ${esc(h.n)}</small></span></a>`).join("")}</div></div>` : "";
+          if (!hits.length && !groups.length) root.querySelector("#sMaps").innerHTML = `<div class="empty">"${esc(ui.q)}"에 맞는 맵·스테이지가 없어요.</div>`;
+        }).catch(() => {});
+      }
       root.querySelectorAll("[data-code]").forEach(b => b.onclick = () => { ui.code = b.dataset.code; ui.q = ""; root.querySelector("#sQ").value = ""; draw(); });
     };
     root.querySelector("#sQ").oninput = e => { ui.q = e.target.value.trim(); draw(); };
