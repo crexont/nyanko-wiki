@@ -1,4 +1,4 @@
-name: schedule
+name: schedule-data
 
 # 게임 서버 이벤트 일정 → schedule-data 브랜치의 schedule.json (사이트 일정 페이지가 읽는다)
 # 계정 정보는 시크릿 NYANKO_READER (tools/schedule.py --init 이 만든 일정 읽기 전용 계정)
