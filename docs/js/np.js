@@ -8,7 +8,13 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";
-const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catNp: 2, drink: false, lv: 19, group: "all" };
+const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all" };
+// 냥코 뽑기(냥코 티켓): 기본 캐릭 아니면 파란구슬. 파란구슬 5개 = 레어 티켓 1장.
+// 뽑기 칸 구성(기본 캐릭 9 + 파란구슬 9, 우주편 3장 뒤 "냥코 뽑기+"는 고양이 초인이 더해져 10 + 9)과
+// 냥코 뽑기+ 기본 캐릭 2NP는 게임 데이터에 없어서 커뮤니티 정리 값을 쓴다.
+const CAT_GATYA = { false: { orb: 9 / 18, cat: 1 }, true: { orb: 9 / 19, cat: 2 } };
+const ORBS_PER_RARE = 5;
+const catTicketNp = rareNp => { const g = CAT_GATYA[opt.catPlus]; return g.orb * rareNp / ORBS_PER_RARE + (1 - g.orb) * g.cat; };
 const opt = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return { ...DEF }; } })();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } catch {} };
 
@@ -53,7 +59,7 @@ function paintOpt(root, d, rareNp, draw) {
       ${num("maxEnergy", "최대 통솔력")}
       ${num("leaderCans", "리더쉽 1개 = 통조림")}
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
-      ${num("catNp", "냥코 티켓 1장 = NP", 0.1)}
+      <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
       <label class="np-in"><span>강습 레벨</span><select data-k="lv">${beh.map(s =>
         `<option value="${s.i}"${s.i === opt.lv ? " selected" : ""}>${s.i === beh.length - 1 ? "Lv.MAX" : `Lv.${s.i + 1}`}</option>`).join("")}</select></label>
     </div>
@@ -63,10 +69,13 @@ function paintOpt(root, d, rareNp, draw) {
       <button class="chip" data-drink aria-pressed="${opt.drink}" title="강습은 30분에 한 번. 바로 다시 하려면 고양이 드링크 A(통조림 ${d.drinkA}개)">강습에 드링크 A 쓰기</button>
     </div>
     <p class="np-note">리더쉽 1개는 통솔력을 최대치만큼 채운다고 보고 환산해요 (통솔력 ${opt.maxEnergy} = 통조림 ${opt.leaderCans}).
-      레어 티켓 1장 = NP ${n2(rareNp)} (지금 열린 레어 뽑기 중 가장 좋은 배너 기준). 냥코 티켓은 냥코 뽑기 결과가 게임 데이터에 다 있지 않아서 직접 넣는 값이에요.</p>`;
+      레어 티켓 1장 = NP ${n2(rareNp)} (지금 열린 레어 뽑기 중 가장 좋은 배너 기준).
+      냥코 티켓 1장 = NP ${n2(catTicketNp(rareNp))}: 파란구슬 ${pct(CAT_GATYA[opt.catPlus].orb * 100)} (${ORBS_PER_RARE}개 = 레어 티켓 1장), 기본 캐릭 중복 ${CAT_GATYA[opt.catPlus].cat}NP.</p>`;
   box.querySelectorAll("[data-k]").forEach(el => el.onchange = () => {
-    const v = +el.value;
-    if (v > 0 || (el.dataset.k === "lv" && v >= 0)) { opt[el.dataset.k] = v; save(); }
+    const k = el.dataset.k, v = +el.value;
+    if (k === "catPlus") opt.catPlus = v === 1;
+    else if (v > 0 || (k === "lv" && v >= 0)) opt[k] = v;
+    save();
     draw();
   });
   box.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { opt.group = b.dataset.g; save(); draw(); });
@@ -173,6 +182,6 @@ function ticketRows(d, sc, now, rareNp) {
   return d.tickets.map(t => ({
     group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map),
     sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도)" : ""}`,
-    np: t.cat * opt.catNp + t.rare * rareNp, energy: t.energy,
+    np: t.cat * catTicketNp(rareNp) + t.rare * rareNp, energy: t.energy,
   }));
 }
