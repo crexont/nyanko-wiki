@@ -50,7 +50,7 @@ def main() -> None:
     if args.retry:
         transfer.main(["--retry", args.retry])
         if FROZEN:
-            input("새 이어하기 코드를 적어 두었으면 엔터를 누르세요...")
+            input("새 이어하기 코드를 확인했으면 엔터를 누르세요 (이어하기_코드.txt 에도 있어요)...")
         return
     if args.code:
         mode = "2"
@@ -63,7 +63,7 @@ def main() -> None:
         pin = args.pin or input("인증번호: ").strip()
         transfer.main([code, pin])  # 냥코_세이브.json 을 만들고 새 코드를 보여준다
         if FROZEN:
-            input("새 이어하기 코드를 적어 두었으면 엔터를 누르세요 (창이 닫히면 다시 볼 수 없어요)...")
+            input("새 이어하기 코드를 확인했으면 엔터를 누르세요 (이어하기_코드.txt 에도 있어요)...")
     else:
         if not args.no_extract:
             log("[1/2] 블루스택에서 세이브 추출")

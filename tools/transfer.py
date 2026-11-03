@@ -4,6 +4,7 @@
   1. 코드로 세이브 받기 (POST nyanko-save /v2/transfers/<코드>/reception)
   2. 받은 원본을 build/transfer/ 에 백업 + 냥코_세이브.json 만들기
   3. 원본 바이트 그대로 다시 올리고 새 이어하기 코드 받기 → 게임에서 이 코드로 이어하기
+     (새 코드는 화면에 보여주고 이어하기_코드.txt 에도 덧붙인다)
 세이브는 절대 고치지 않는다 (bcsfe의 get_codes 는 세이브를 다시 저장해서 올리고, 실패하면 새 계정을 만들어
 버리므로 쓰지 않고 같은 요청을 직접 보낸다). 3이 실패하면 --retry <백업.sav> 로 다시 올린다.
 
@@ -27,6 +28,7 @@ from common import FROZEN, ROOT, use_local_bcsfe_dir
 SAVE_URL = "https://nyanko-save.ponosgames.com"
 BACKUP_DIR = os.path.join(ROOT, "build", "transfer")
 OUT = os.path.join(ROOT, "냥코_세이브.json")
+CODES_TXT = os.path.join(ROOT, "이어하기_코드.txt")
 UA = "Dalvik/2.1.0 (Linux; U; Android 9; SM-G955F Build/N2G48B)"
 KR = core.CountryCode.from_code("kr")
 
@@ -87,12 +89,28 @@ def reupload(raw: bytes, password: str) -> tuple[str, str]:
     return payload["transferCode"], payload["pin"]
 
 
+def save_codes(code: str, pin: str) -> str | None:
+    """창을 닫아도 남도록 CODES_TXT 에 덧붙인다 (맨 아래가 최신). 실패하면 None."""
+    try:
+        new = not os.path.exists(CODES_TXT)
+        with open(CODES_TXT, "a", encoding="utf-8-sig" if new else "utf-8") as f:
+            if new:
+                f.write("냥코위키가 발급받은 새 이어하기 코드 (맨 아래가 최신, 한 번 쓴 코드는 다시 못 써요)\n"
+                        "이어하기 코드는 비밀번호와 같아요. 남에게 보여주지 마세요.\n\n")
+            f.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M}  이어하기 코드 {code}  인증번호 {pin}\n")
+        return CODES_TXT
+    except OSError:
+        return None
+
+
 def show_codes(code: str, pin: str) -> None:
+    saved = save_codes(code, pin)
     print("\n" + "=" * 40)
     print(f"  새 이어하기 코드 : {code}")
     print(f"  새 인증번호     : {pin}")
     print("=" * 40)
-    print("게임 첫 화면 → 이어하기 에서 위 코드를 입력하면 그대로 계속할 수 있어요.\n")
+    print("게임 첫 화면 → 이어하기 에서 위 코드를 입력하면 그대로 계속할 수 있어요.")
+    print(f"이 코드는 {saved} 에도 적어 뒀어요.\n" if saved else "코드를 파일에 적지 못했어요. 꼭 따로 적어 두세요.\n")
 
 
 def main(argv: list[str] | None = None) -> None:

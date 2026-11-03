@@ -4,6 +4,7 @@
 jp.co.ponos.battlecatskr/
 *SAVE_DATA*
 *세이브*.json
+/이어하기_코드.txt
 
 # 원본 게임 팩 (사이트용 docs/gamedata.js, docs/icons/ 는 tools/build_gamedata.py 로 만들어 커밋)
 *.pack
