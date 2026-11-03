@@ -72,8 +72,8 @@ function paintOpt(root, d, rareNp, draw) {
       ${num("maxEnergy", "최대 통솔력")}
       ${num("leaderCans", "리더쉽 1개 = 통조림")}
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
-      <label class="np-in"><span>레어 티켓 쓰는 뽑기</span><select data-k="rareBase"><option value="auto">자동 (지금 열린 배너 중 최고)</option>${RARE_KINDS.map(([k, name]) =>
-        `<option value="${k}"${k === opt.rareBase ? " selected" : ""}>${name}</option>`).join("")}</select></label>
+      <label class="np-in"><span>레어 티켓 쓰는 뽑기</span><select data-k="rareBase"><option value="auto">자동 (지금 열린 배너 중 최고)</option>${RARE_KINDS.map(([k, name, r]) =>
+        `<option value="${k}"${k === opt.rareBase ? " selected" : ""}>${name}  (${r.join(" / ")})</option>`).join("")}</select></label>
       <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
       <label class="np-in"><span>강습 레벨</span><select data-k="lv">${beh.map(s =>
         `<option value="${s.i}"${s.i === opt.lv ? " selected" : ""}>${s.i === beh.length - 1 ? "Lv.MAX" : `Lv.${s.i + 1}`}</option>`).join("")}</select></label>
