@@ -7,7 +7,7 @@ import { loadIndex } from "./stage.js";
 const LOCAL = /^(localhost|127\.|\[::1\])/.test(location.hostname);
 const SRC = LOCAL ? "data/schedule.json" : "https://raw.githubusercontent.com/crexont/nyanko-wiki/schedule-data/schedule.json";
 let dataPromise, setsPromise, dropsPromise;
-const loadSchedule = () => dataPromise ??= fetch(SRC, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+export const loadSchedule = () => dataPromise ??= fetch(SRC, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 const loadSets = () => setsPromise ??= fetch("data/gatya_sets.json").then(r => r.json());
 const loadDrops = () => dropsPromise ??= fetch("data/stages/cat_drops.json").then(r => r.json());
 
@@ -42,7 +42,7 @@ function ruleText(r) {
 }
 
 // 지금 열려 있는지 (기간 + 조건 중 하나라도 맞으면)
-function openNow(e, now) {
+export function openNow(e, now) {
   if (e.start && now < Date.parse(e.start)) return false;
   if (e.end && now >= Date.parse(e.end)) return false;
   if (!e.rules) return true;

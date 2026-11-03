@@ -8,6 +8,7 @@ import { renderPlan } from "./plan.js";
 import { renderEnemies, renderEnemy, loadEnemies, enemyIcon } from "./enemy.js";
 import { renderStages, renderMap, renderStage } from "./stage.js";
 import { renderSchedule } from "./schedule.js";
+import { renderNp } from "./np.js";
 
 const main = document.getElementById("page");
 let refresh = null;  // 지금 페이지를 다시 그리는 함수 (내 도감 데이터가 바뀌면 호출)
@@ -20,6 +21,7 @@ const NAV = [
   { href: "#/enemies", label: "적", match: /^#\/enem/ },
   { href: "#/stages", label: "스테이지", match: /^#\/stage/ },
   { href: "#/schedule", label: "일정", match: /^#\/schedule/ },
+  { href: "#/np", label: "NP효율", match: /^#\/np/ },
 ];
 
 // 홈 메뉴: [주소, 이름, 짧은 설명, 그림]
@@ -30,6 +32,7 @@ const HOME_MENU = [
   ["#/enemies", "적", "배율·능력·상대 캐릭", "icons/enemy/4.png"],
   ["#/stages", "스테이지", "출현 적·드롭", "icons/enemy/2.png"],
   ["#/schedule", "일정", "스테이지·뽑기 일정", "icons/items/20.png"],
+  ["#/np", "NP효율", "뽑기·강습·지도 NP 비교", "icons/items/7.png"],
 ];
 
 function renderHome(root) {
@@ -107,6 +110,7 @@ function route() {
   else if (h.startsWith("#/dex")) refresh = renderDex(main);
   else if (h.startsWith("#/plan")) refresh = renderPlan(main);
   else if (h.startsWith("#/schedule")) refresh = renderSchedule(main);
+  else if (h.startsWith("#/np")) refresh = renderNp(main);
   else { renderHome(main); refresh = null; }
   document.querySelectorAll(".nav a").forEach(a =>
     a.toggleAttribute("aria-current", NAV.find(n => n.href === a.getAttribute("href"))?.match.test(h)));

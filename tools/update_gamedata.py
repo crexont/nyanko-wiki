@@ -4,7 +4,7 @@
   1. extract_vhdx --with-packs   기기에서 세이브·팩 꺼내기
   2. 세이브에서 게임 버전 읽기
   3. unpack_gamedata              APK 데이터 팩 → bcsfe 게임 데이터 폴더
-  4. build_gamedata → build_enemies → build_stages → build_gatya_sets (이 순서여야 아이콘이 안 지워진다)
+  4. build_gamedata → build_enemies → build_stages → build_gatya_sets → build_np (이 순서여야 아이콘이 안 지워진다)
   5. 바뀐 내용 요약 (새 캐릭·진화·본능, 적·스테이지 수)
 사용: python tools/update_gamedata.py [--version 15.7.0]   (--version 을 주면 2를 건너뛴다)
 """
@@ -19,6 +19,7 @@ from bcsfe import core
 import build_enemies
 import build_gamedata
 import build_gatya_sets
+import build_np
 import build_stages
 import extract_vhdx
 import unpack_gamedata
@@ -91,6 +92,7 @@ def main(argv: list[str] | None = None) -> None:
     build_enemies.main(v)
     build_stages.main(v)
     build_gatya_sets.main(v)
+    build_np.main(v)
     summary(before, snapshot())
 
 

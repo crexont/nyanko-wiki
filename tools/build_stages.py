@@ -137,6 +137,11 @@ def drop_chances(drop: list[list[int]], rand: int) -> list | None:
     return [d[0] for d in drop]
 
 
+# 스테이지 보상의 11·12·13은 GatyaitemName 행(XP 10000 등)이 아니라 티켓·통조림.
+# "냥코티켓★찬스!", "역습의 하마양"(냥코 티켓), 재회의 지도·강습 Lv.15(레어 티켓)로 확인. 13(통조림)은 개수(20·30·50)로 추정
+REWARD_ALIAS = {11: 20, 12: 21, 13: 22}
+
+
 def parse_reward(row: list[int]) -> dict:
     """MapStageData 한 줄: 통솔력, 경험치, … 드롭. BCU DefStageInfo 생성자와 같은 해석."""
     out = {"energy": row[0], "xp": row[1]}
@@ -152,7 +157,7 @@ def parse_reward(row: list[int]) -> dict:
     drop = [d for d in drop if len(d) == 3 and d[1] >= 0 and d[2] > 0]
     if drop:
         ch = drop_chances(drop, rand)
-        out["drop"] = [[*d[1:], (ch[k] if ch and k < len(ch) else None)] for k, d in enumerate(drop)]
+        out["drop"] = [[REWARD_ALIAS.get(d[1], d[1]), d[2], (ch[k] if ch and k < len(ch) else None)] for k, d in enumerate(drop)]
         if ch == []:
             out["dropAll"] = 1
         if rand == 1:
