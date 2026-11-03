@@ -15,3 +15,7 @@ __pycache__/
 build/
 /bcsfe_data/
 docs/_test*.json
+
+# 일정 읽기 전용 계정 정보 (Actions 시크릿으로만), 받은 일정 데이터 (schedule-data 브랜치로 올림)
+/schedule_reader.json
+docs/data/schedule.json

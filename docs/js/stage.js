@@ -4,7 +4,7 @@ import { loadEnemies, enemyIcon, enemyHp, enemyAtk, enemyCycle } from "./enemy.j
 
 let indexPromise;
 const catPromises = {};
-const loadIndex = () => indexPromise ??= fetch("data/stages/index.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+export const loadIndex = () => indexPromise ??= fetch("data/stages/index.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 let namesPromise;
 const loadNames = () => namesPromise ??= fetch("data/stages/stage_names.json").then(r => r.json());
 const loadCat = code => catPromises[code] ??= fetch(`data/stages/${code}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });

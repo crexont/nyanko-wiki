@@ -1,0 +1,47 @@
+name: schedule
+
+# 게임 서버 이벤트 일정 → schedule-data 브랜치의 schedule.json (사이트 일정 페이지가 읽는다)
+# 계정 정보는 시크릿 NYANKO_READER (tools/schedule.py --init 이 만든 일정 읽기 전용 계정)
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: schedule
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Fetch schedule
+        env:
+          NYANKO_READER: ${{ secrets.NYANKO_READER }}
+        run: |
+          test -n "$NYANKO_READER" || { echo "시크릿 NYANKO_READER 가 없음"; exit 1; }
+          python tools/schedule.py -o "$RUNNER_TEMP/pub/schedule.json"
+
+      # 브랜치 하나에 커밋 하나만 남긴다 (매시간 덮어써서 기록이 쌓이지 않게)
+      - name: Publish to schedule-data
+        working-directory: ${{ runner.temp }}/pub
+        run: |
+          git init -q -b schedule-data
+          git add schedule.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "일정 데이터 갱신"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" schedule-data
