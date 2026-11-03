@@ -69,6 +69,17 @@ const hasDex = () => !!store.data?.cats && Object.keys(store.data.cats).length >
 // 이 일정에서 얻을 수 있는데 내 도감에 없는 캐릭
 const newCats = r => hasDex() ? (r.cats || []).filter(c => !store.owned(c.id)) : [];
 
+// 달력에 넣을 스테이지 (맵 번호로 기억 → 같은 맵이 다음에 또 열려도 그대로 표시). 이 브라우저에만 저장
+const PIN_KEY = "nyanko-wiki.schedulePins";
+const pins = (() => { try { return new Set(JSON.parse(localStorage.getItem(PIN_KEY)) || []); } catch { return new Set(); } })();
+const pinned = r => r.maps?.some(m => pins.has(m));
+function togglePin(maps) {
+  const on = maps.some(m => pins.has(m));
+  maps.forEach(m => on ? pins.delete(m) : pins.add(m));
+  try { localStorage.setItem(PIN_KEY, JSON.stringify([...pins])); } catch {}
+}
+const pinBtn = r => `<button class="sc-pin" data-pin="${r.maps.join(",")}" aria-pressed="${pinned(r)}" title="달력에 이 스테이지 표시">${pinned(r) ? "✓ 달력에 표시 중" : "+ 달력에 표시"}</button>`;
+
 export function renderSchedule(root) {
   root.innerHTML = `
     <p class="crumb"><a href="#/">냥코위키</a><i>/</i><span>일정</span></p>
@@ -108,11 +119,11 @@ export function renderSchedule(root) {
       const hint = dex ? "" : `<p class="sc-hint">내 도감에 세이브를 불러오면, 내가 아직 없는 캐릭을 얻을 수 있는 뽑기·스테이지에 ★ 표시가 붙어요. <a href="#/dex">내 도감</a></p>`;
       if (ui.view === "today") body.innerHTML = hint + todayView(shown, rows, now);
       else if (ui.view === "cal") {
-        // 달력은 기간 한정 일정만 (상시 이벤트는 매일 칸을 채워 버린다)
+        // 달력은 기간 한정 일정만 (상시 이벤트는 매일 칸을 채워 버린다). 스테이지는 고른 것만
         const limited = shown.filter(r => !regular(r));
         const onDay = limited.filter(r => startDay(r) <= ui.day && ui.day <= endDay(r));
         const [, m, d, w] = ymd(ui.day);
-        body.innerHTML = hint + calendar(limited, today)
+        body.innerHTML = hint + stagePicker(limited, now) + calendar(limited.filter(r => r.kind !== "stage" || pinned(r)), today)
           + `<h3 class="sc-dayhead">${m + 1}월 ${d}일 (${WEEK[w]}) 일정 <small>${onDay.length}개</small></h3>`
           + (panels(onDay) || `<div class="empty">이 날은 기간 한정 일정이 없어요.</div>`);
       } else {
@@ -124,6 +135,15 @@ export function renderSchedule(root) {
       root.querySelectorAll("[data-show]").forEach(b => b.onclick = () => { ui.show = b.dataset.show; draw(); });
       root.querySelector("[data-reg]")?.addEventListener("click", () => { ui.regular = !ui.regular; draw(); });
       root.querySelector("[data-new]")?.addEventListener("click", () => { ui.onlyNew = !ui.onlyNew; draw(); });
+      root.querySelectorAll("[data-pin]").forEach(b => b.onclick = () => {
+        const open = root.querySelector(".sc-picker")?.open;
+        togglePin(b.dataset.pin.split(",").map(Number));
+        const y = scrollY;
+        draw();
+        const p = root.querySelector(".sc-picker");
+        if (p && open != null) p.open = open;
+        scrollTo(0, y);
+      });
       root.querySelectorAll("[data-mon]").forEach(b => b.onclick = () => {
         if (b.dataset.mon === "0") { const [y, m] = ymd(today); ui.month = y * 12 + m; ui.day = today; } else ui.month += +b.dataset.mon;
         draw();
@@ -142,12 +162,23 @@ export function renderSchedule(root) {
 // ---- 카드 (목록·달력에서 고른 날짜·오늘) ----
 function card(r, top = "") {
   const nc = newCats(r);
-  const badge = nc.length ? `<span class="sc-newbadge">★ 없는 캐릭 ${nc.length}</span>` : "";
-  const newRow = nc.length && r.kind === "stage"
-    ? `<div class="sc-cats sc-newcats"><small>드롭:</small>${nc.slice(0, 10).map(c => `<a href="#/cat/${c.id}" title="${esc(c.forms[0].name)}">${icon(c, 0)}</a>`).join("")}${nc.length > 10 ? `<span>외 ${nc.length - 10}</span>` : ""}</div>` : "";
+  // 뽑기는 없는 캐릭 수, 스테이지는 ★만 (드롭되는 없는 캐릭 이름은 마우스를 올리면)
+  const badge = !nc.length ? "" : r.kind === "stage"
+    ? `<span class="sc-newbadge" title="없는 캐릭 드롭: ${esc(nc.map(c => c.forms[0].name).join(", "))}">★</span>`
+    : `<span class="sc-newbadge">★ 없는 캐릭 ${nc.length}</span>`;
   return `<div class="sc-item${r.open ? " open" : ""}${nc.length ? " has-new" : ""}">
-    <div class="sc-when">${top}<span>${period(r)}</span>${r.open ? `<span class="sc-open">지금 열림</span>` : ""}${badge}</div>
-    <div class="sc-main">${r.main()}${newRow}</div></div>`;
+    <div class="sc-when">${top}<span>${period(r)}</span>${r.open ? `<span class="sc-open">지금 열림</span>` : ""}${badge}${r.kind === "stage" && !regular(r) ? pinBtn(r) : ""}</div>
+    <div class="sc-main">${r.main()}</div></div>`;
+}
+
+// 달력에 넣을 스테이지 고르기: 지금·앞으로 열리는 기간 한정 스테이지
+function stagePicker(rows, now) {
+  const list = rows.filter(r => r.kind === "stage" && (!r.end || Date.parse(r.end) > now))
+    .sort((a, b) => (a.start || "") < (b.start || "") ? -1 : 1);
+  if (!list.length) return "";
+  const n = list.filter(pinned).length;
+  return `<details class="panel sc-picker"${n ? "" : " open"}><summary><b>달력에 넣을 스테이지</b> <small>${n}개 선택 · 뽑기·이벤트는 항상 보여요</small></summary>
+    <div class="sc-pick">${list.map(r => `<button class="chip" data-pin="${r.maps.join(",")}" aria-pressed="${pinned(r)}" title="${esc(period(r))}">${newCats(r).length ? "★ " : ""}${esc(barLabel(r))} <small>${fmt(r.start).split(" ")[0]}~${r.end ? fmt(r.end).split(" ")[0] : ""}</small></button>`).join("")}</div></details>`;
 }
 
 // 종류별 패널
@@ -329,7 +360,7 @@ function stageRows(list, maps, dropsByMap, now) {
     const main = () => `
         <div class="sc-maps">${known.map(m => `<a href="#/stage/${m}">${esc(maps.get(m).name)}<small>${esc(maps.get(m).cat)}</small></a>`).join("")}${other ? `<span class="sc-more">그 외 ${other}개</span>` : ""}</div>
         ${e.rules ? `<p class="sc-rule">${e.rules.map(ruleText).filter(Boolean).map(esc).join(" / ")}</p>` : ""}`;
-    return { kind: "stage", start: e.start, end: e.end, rules: e.rules, label: maps.get(known[0]).name, cnt: known.length,
+    return { kind: "stage", start: e.start, end: e.end, rules: e.rules, label: maps.get(known[0]).name, cnt: known.length, maps: known,
              cats, open: openNow(e, now), href: `#/stage/${known[0]}`, main };
   }).filter(Boolean);
 }
