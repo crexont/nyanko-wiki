@@ -25,6 +25,8 @@ CAT_TICKET, RARE_TICKET = 20, 21
 DRINK_A = 55
 # 강습 EX 스테이지 (기원·정점·비경 × 6속성). 같은 이름의 지도 스테이지(25009~)와 드롭이 달라서 번호로 고른다.
 EX_MAPS = range(25033, 25051)
+# 재회의 지도: 복귀 유저에게만 주는 지도라 비교에서 뺀다 (사용자 결정)
+SKIP_MAPS = {25070, 25071, 25072}
 
 
 def stage_files(out_dir: str):
@@ -123,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
     # 냥코 티켓·레어 티켓을 반복해서 얻는 스테이지 (고양이 드링크 스테이지 B는 통솔력이 아니라서 뺀다)
     tickets = []
     for mid, (code, m) in sorted(maps.items()):
-        if code == "B":
+        if code == "B" or mid in SKIP_MAPS:
             continue
         for st in m["stages"]:
             d = repeat_drops(st)
