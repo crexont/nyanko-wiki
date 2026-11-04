@@ -21,6 +21,8 @@ from build_gamedata import SITE, game_data_dir, read
 from build_stages import SKIP_FILES
 
 ORB = 30000          # 보상 아이템 번호 - ORB = 본능옥 번호
+XP_DROP = 6          # 스테이지 보상 6 = XP (개수 = XP 양)
+XP_MAPS = 20         # 경험치 스테이지는 효율 좋은 맵 이만큼만
 CAT_TICKET, RARE_TICKET = 20, 21
 DRINK_A = 55
 LIMITED = 3          # 이벤트 뽑기에서 캐릭이 나오는 등급 칸 (울슈레 자리 = 한정 캐릭터)
@@ -46,6 +48,11 @@ def repeat_drops(st: dict) -> list:
         if 0 < first < 100 and abs(first + rest - 100) < 0.5:
             d = [[i, n, p * 100 / rest] for i, n, p in d]
     return [x for x in d if x[2]]
+
+
+def stage_xp(st: dict) -> int:
+    """한 번 클리어할 때 XP 기대값: 클리어 경험치(보물·아이템 보너스 전) + XP 드롭."""
+    return round((st.get("xp") or 0) + sum(n * p / 100 for i, n, p in repeat_drops(st) if i == XP_DROP))
 
 
 def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
@@ -105,7 +112,7 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
                 if str(item) in gacha:
                     got[str(item)] += n * p / 100
             if got:
-                stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"),
+                stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                "t": {k: round(v, 3) for k, v in got.items()}})
     return gacha, stages
 
@@ -154,7 +161,7 @@ def main(argv: list[str] | None = None) -> None:
                 tier = next(i for i, w in enumerate(("기원", "정점", "비경")) if w in m["n"])
                 ex_tier.setdefault(tier, set()).add(ev)
             else:
-                orb_maps.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"),
+                orb_maps.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                  "np": ev, "grades": grades})
     # EX 스테이지 NP는 속성과 상관없이 단계마다 같다 (다르면 빌드를 멈춘다)
     assert all(len(v) == 1 for v in ex_tier.values()), ex_tier
@@ -185,7 +192,7 @@ def main(argv: list[str] | None = None) -> None:
         for st in m["stages"]:
             pr = b["stages"].get(st["i"])
             if pr:
-                rows.append({"i": st["i"], "name": st["n"], "energy": st.get("energy"),
+                rows.append({"i": st["i"], "name": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                              "ex": [round(pr.get(x, 0), 2) for x in ids]})
         beh_out.append({"map": mid, "name": m["n"], "stages": rows})
 
@@ -199,10 +206,33 @@ def main(argv: list[str] | None = None) -> None:
             cat = sum(n * p / 100 for item, n, p in d if item == CAT_TICKET)
             rare = sum(n * p / 100 for item, n, p in d if item == RARE_TICKET)
             if cat or rare:
-                tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"),
+                tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                 "cat": round(cat, 3), "rare": round(rare, 3)})
 
     gacha, gacha_stages = ticket_gacha(D, maps)
+
+    # 경험치 스테이지: 통솔력당 XP가 좋은 맵 (고양이 드링크 스테이지 B는 통솔력이 아니라서 뺀다)
+    by_map = collections.defaultdict(list)
+    for mid, (code, m) in maps.items():
+        if code == "B" or mid in SKIP_MAPS:
+            continue
+        for st in m["stages"]:
+            xp, e = stage_xp(st), st.get("energy") or 0
+            if xp and e > 0:
+                by_map[mid].append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": e, "xp": xp})
+    best = sorted(by_map, key=lambda k: -max(x["xp"] / x["energy"] for x in by_map[k]))
+    # 같은 이름으로 다시 열린 맵(복각)은 하나만
+    xp_stages, seen = [], set()
+    for mid in best:
+        if by_map[mid][0]["name"] in seen:
+            continue
+        seen.add(by_map[mid][0]["name"])
+        xp_stages += by_map[mid]
+        if len(seen) >= XP_MAPS:
+            break
+    # 뽑기에서 나오는 XP 아이템 (Gatyaitembuy srcItemID 6, quantity = XP 양)
+    gi = [l.split(",") for l in read(os.path.join(D, "Gatyaitembuy.csv"))[1:] if l.strip()]
+    xp_items = {str(i): int(r[4]) for i, r in enumerate(gi) if r[8].strip() == "6"}
 
     drink = None
     rows = read(os.path.join(D, "itemShopData.tsv"))
@@ -214,13 +244,13 @@ def main(argv: list[str] | None = None) -> None:
 
     data = {"dupe": dupe, "gradeNp": grade_np, "exNp": ex_np, "drinkA": drink,
             "behemoth": beh_out, "orbMaps": orb_maps, "tickets": tickets,
-            "gacha": gacha, "gachaStages": gacha_stages}
+            "gacha": gacha, "gachaStages": gacha_stages, "xpStages": xp_stages, "xpItems": xp_items}
     out = os.path.join(SITE, "data", "np.json")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{out}: 중복 NP {dupe}, 본능옥 NP {grade_np}, EX {ex_np}, 강습 {len(beh_out)}개, "
           f"본능옥 스테이지 {len(orb_maps)}개, 티켓 스테이지 {len(tickets)}개, 드링크 A {drink}통조림, "
-          f"티켓 뽑기 {len(gacha)}종, 티켓 뽑기 스테이지 {len(gacha_stages)}개")
+          f"티켓 뽑기 {len(gacha)}종, 티켓 뽑기 스테이지 {len(gacha_stages)}개, 경험치 맵 {len(seen)}개")
 
 
 if __name__ == "__main__":
