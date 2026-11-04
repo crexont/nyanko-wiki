@@ -41,7 +41,8 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } cat
 const RATE_RARITY = [0, 2, 3, 4, 5];  // 뽑기 확률 순서 [노멀, 레어, 슈레, 울슈레, 레전드] → 레어도 (np.json dupe 순서)
 const BASE_RATES = [[0, 0], [7000, 0], [2500, 0], [500, 0], [0, 0]];  // 일정 데이터가 없을 때 레어 티켓 기준
 const TIERS = ["기원", "정점", "비경"];
-const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", event: "이벤트·럭키 티켓", xp: "경험치" };
+const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", lucky: "럭키 티켓", event: "이벤트 티켓", xp: "경험치" };
+const LUCKY = new Set(["155", "156"]);  // 럭키 티켓 · 럭키 티켓G
 
 const pullNp = (rates, dupe) => rates.reduce((s, [p], i) => s + p / 1e4 * dupe[RATE_RARITY[i]], 0);
 const n2 = x => x.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -342,7 +343,7 @@ function eventRows(d, sc, now, tg) {
     seen.add(dup);
     const exP = s.ex ? exProb(s.ex) : 0, xp = s.xp + (s.ex ? exP * s.ex.xp : 0);
     const got = [s.t[tid] && `${+s.t[tid].toFixed(2)}장`, s.ex?.t[tid] && exP && `EX ${+(exP * 100).toFixed(1)}% × ${s.ex.t[tid]}장`].filter(Boolean).join(" + ");
-    rows.push({ group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
+    rows.push({ group: LUCKY.has(tid) ? "lucky" : "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
       np: n * (t.np || 0) + xpNp(xp), energy: s.energy });
   }
