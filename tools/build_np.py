@@ -40,7 +40,11 @@ def repeat_drops(st: dict) -> list:
     """반복 클리어로 얻는 드롭 [아이템, 개수, 확률%] (확률 없는 것·1회 한정 첫 보상은 뺀다)."""
     d = st.get("drop") or []
     if st.get("dropOnce"):
-        d = d[1:]
+        first, d = d[0][2] or 0, d[1:]
+        # 1회 한정 보상이 확률로 나오는 경우(민달팽이 고양이 3% 등), 그걸 얻은 뒤엔 나머지가 100%를 나눠 갖는다
+        rest = sum(x[2] or 0 for x in d)
+        if 0 < first < 100 and abs(first + rest - 100) < 0.5:
+            d = [[i, n, p * 100 / rest] for i, n, p in d]
     return [x for x in d if x[2]]
 
 

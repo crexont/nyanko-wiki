@@ -121,7 +121,7 @@ def drop_chances(drop: list[list[int]], rand: int) -> list | None:
         return []
     if total == 100:
         return [d[0] for d in drop]
-    if total > 100 and rand in (0, 1):
+    if total > 100 and rand in (0, 1, 2):
         rest, out = 100.0, []
         items = drop
         if drop[0][0] == 100:
@@ -139,7 +139,8 @@ def drop_chances(drop: list[list[int]], rand: int) -> list | None:
 
 # 스테이지 보상의 11·12·13은 GatyaitemName 행(XP 10000 등)이 아니라 티켓·통조림.
 # "냥코티켓★찬스!", "역습의 하마양"(냥코 티켓), 재회의 지도·강습 Lv.15(레어 티켓)로 확인. 13(통조림)은 개수(20·30·50)로 추정
-REWARD_ALIAS = {11: 20, 12: 21, 13: 22}
+# 21은 옛 럭키 티켓 번호 (축축 미끌미끌 대진격! 옛 맵 S_142만 씀, 새 맵 S_164는 같은 자리에 155 럭키 티켓)
+REWARD_ALIAS = {11: 20, 12: 21, 13: 22, 21: 155}
 
 
 def parse_reward(row: list[int]) -> dict:
@@ -160,8 +161,8 @@ def parse_reward(row: list[int]) -> dict:
         out["drop"] = [[REWARD_ALIAS.get(d[1], d[1]), d[2], (ch[k] if ch and k < len(ch) else None)] for k, d in enumerate(drop)]
         if ch == []:
             out["dropAll"] = 1
-        if rand == 1:
-            out["dropOnce"] = 1   # 첫 번째 보상은 1회 한정
+        if rand in (1, 2):
+            out["dropOnce"] = 1   # 첫 번째 보상은 1회 한정 (2 = 극락 사우나 등, 나무위키 주회 표와 일치)
     if is_time:
         out["timeDrop"] = [row[16 + i * 3:19 + i * 3] for i in range((len(row) - 17) // 3)]
     return out
