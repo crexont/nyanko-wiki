@@ -595,4 +595,7 @@ fieldset:disabled{opacity:.45}
 .np-table tr.np-sub td{opacity:.85}
 .np-lab{align-self:center;font-size:12px;color:var(--muted)}
 .np-tin{width:72px}
+th .np-unit,.np-unit{appearance:textfield;-moz-appearance:textfield;width:3.2em;height:auto;min-height:0;box-shadow:none;margin:0 2px;padding:1px 4px;font:inherit;text-align:right;color:var(--accent);font-weight:700;background:transparent;border:0;border-bottom:2px dashed var(--accent);border-radius:0;cursor:pointer}
+th .np-unit::-webkit-inner-spin-button,th .np-unit::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.np-unit:focus{border-style:solid;cursor:text}
 .np-how{margin:0;padding-left:18px;font-size:13.5px;line-height:1.75}

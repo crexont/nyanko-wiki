@@ -78,8 +78,6 @@ function paintOpt(root, d, rareNp, draw) {
   const num = (k, label, step = 1) => `<label class="np-in"><span>${label}</span><input type="number" min="1" step="${step}" data-k="${k}" value="${opt[k]}"></label>`;
   box.innerHTML = `
     <div class="row np-opts">
-      ${num("perEnergy", "비교 기준 통솔력")}
-      ${num("perCans", "비교 기준 통조림")}
       ${num("maxEnergy", "최대 통솔력")}
       ${num("leaderCans", "리더쉽 1개 = 통조림")}
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
@@ -92,7 +90,7 @@ function paintOpt(root, d, rareNp, draw) {
     </div>
     <div class="row np-opts">
       <span class="np-lab">NP로 칠 것</span>
-      ${[["npRare", "레어 티켓 뽑기", "레어 티켓을 뽑아서 나온 캐릭을 NP로 (끄면 레어 티켓은 아껴 두는 재화로 보고 0)"],
+      ${[["npRare", "레어 티켓 뽑기", "레어 티켓을 뽑아서 나온 캐릭을 전부 NP로. 새 캐릭이거나 +레벨이 덜 찼으면 실제로는 NP가 안 되니, 그럴 땐 끄세요 (레어 티켓 0NP)"],
         ["npBlue", "파란구슬 → 레어 티켓", "냥코 뽑기 파란구슬 5개를 레어 티켓으로 바꿔 뽑기 (레어 티켓 뽑기가 켜져 있어야 의미 있음)"],
         ["npOrb", "본능옥 분해", "강습·지도에서 나온 본능옥을 전부 NP로 (끄면 강습·지도는 0)"],
         ["npXp", "경험치", "스테이지 클리어 경험치·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"]].map(([k, l, t]) =>
@@ -144,6 +142,7 @@ function paintBody(root, rows, d, tg, draw) {
   }
   const list = [...heads.values()];
   const E = `통솔력 ${opt.perEnergy}당`, C = `통조림 ${opt.perCans}당`;
+  const unit = k => `<input class="np-unit" type="number" min="1" step="1" data-u="${k}" value="${opt[k]}" title="눌러서 비교 기준을 바꿔요">`;
   const cost = r => [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
   const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
         <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
@@ -151,7 +150,7 @@ function paintBody(root, rows, d, tg, draw) {
         <td data-l="${E}">${n2(r.e100)}</td><td data-l="${C}"><b>${n2(r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
     <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · NP / ${C} 순</span></h2>
-      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / ${E}</th><th>NP / ${C}</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / 통솔력 ${unit("perEnergy")}당</th><th>NP / 통조림 ${unit("perCans")}당</th></tr></thead><tbody>
       ${list.map(r => tr(r, false) + r.more.map(m => tr(m, true)).join("")).join("")}
       </tbody></table></div></div>
     ${ticketPanel(d, tg)}
@@ -171,6 +170,11 @@ function paintBody(root, rows, d, tg, draw) {
     root.querySelectorAll(`tr[data-p="${CSS.escape(k)}"]`).forEach(t => t.hidden = !on);
     b.setAttribute("aria-expanded", on);
     b.textContent = b.textContent.replace(/(보기 ▾|접기 ▴)$/, on ? "접기 ▴" : "보기 ▾");
+  });
+  root.querySelectorAll("[data-u]").forEach(el => el.onchange = () => {
+    const v = Math.round(+el.value);
+    if (v > 0) { opt[el.dataset.u] = v; save(); }
+    draw();
   });
   root.querySelectorAll("[data-tnp]").forEach(el => el.onchange = () => {
     const v = el.value.trim() === "" ? null : +el.value;
