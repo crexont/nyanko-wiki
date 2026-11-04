@@ -291,7 +291,7 @@ function ticketPanel(d, tg) {
       return `<tr${t.open ? ` class="boss"` : ""}>
         <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : grades}${t.est || t.open ? "" : ` · ${t.start.slice(5, 10).replace("-", "/")} 시작`}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b></td>
-        <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${spec ? `<br>특별 아이템: ${esc(spec)}` : ""}</small></td>
+        <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
         <td data-l="드롭 스테이지"><small>${st.length ? `${st.length}곳 · 최고 100통솔력당 ${n2(st[0].t[tid] / st[0].energy * 100)}장 (<a href="#/stage/${st[0].map}/${st[0].i}">${esc(st[0].name)} ${esc(st[0].stage)}</a>)` : "-"}</small></td></tr>`;
     }).join("")}
     </tbody></table></div></div>`;
