@@ -102,21 +102,30 @@ function paintOpt(root, d, rareNp, draw) {
 
 // ---- 표 ----
 // 행 = { group, name, sub, href, np(1회), energy(통솔력), cans(통조림), open }
+const unfolded = new Set();  // 펼친 맵 (fold 키)
 function paintBody(root, rows, d, tg) {
   const cpe = opt.leaderCans / opt.maxEnergy;  // 통솔력 1 = 통조림
   const calc = r => {
     const cans = (r.energy || 0) * cpe + (r.cans || 0), energy = (r.energy || 0) + (r.cans || 0) / cpe;
     return { ...r, c100: r.np / cans * 100, e100: r.np / energy * 100, lead: r.np / energy * opt.maxEnergy };
   };
-  const list = rows.filter(r => opt.group === "all" || r.group === opt.group).map(calc).sort((a, b) => b.c100 - a.c100);
+  const sorted = rows.filter(r => opt.group === "all" || r.group === opt.group).map(calc).sort((a, b) => b.c100 - a.c100);
+  // 같은 맵(fold 키)의 스테이지는 가장 좋은 것 하나만 보이고 나머지는 접어 둔다
+  const heads = new Map();
+  for (const r of sorted) {
+    const h = r.fold && heads.get(r.fold);
+    if (h) h.more.push(r); else heads.set(r.fold || Symbol(), { ...r, more: [] });
+  }
+  const list = [...heads.values()];
   const cost = r => [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
+  const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
+        <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
+        <td data-l="1회 NP">${n2(r.np)}</td><td data-l="비용">${cost(r)}</td>
+        <td data-l="100통솔력당">${n2(r.e100)}</td><td data-l="리더쉽당">${n2(r.lead)}</td><td data-l="100통조림당"><b>${n2(r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
     <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · 100통조림당 순</span></h2>
       <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>1회 NP</th><th>비용</th><th>100통솔력당</th><th>리더쉽당</th><th>100통조림당</th></tr></thead><tbody>
-      ${list.map(r => `<tr${r.open ? ` class="boss"` : ""}>
-        <td class="en-name"><small class="np-g">${GROUPS[r.group]}</small> ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}</td>
-        <td data-l="1회 NP">${n2(r.np)}</td><td data-l="비용">${cost(r)}</td>
-        <td data-l="100통솔력당">${n2(r.e100)}</td><td data-l="리더쉽당">${n2(r.lead)}</td><td data-l="100통조림당"><b>${n2(r.c100)}</b></td></tr>`).join("")}
+      ${list.map(r => tr(r, false) + r.more.map(m => tr(m, true)).join("")).join("")}
       </tbody></table></div></div>
     ${ticketPanel(d, tg)}
     <div class="panel"><h2>계산 방법</h2><ul class="np-how">
@@ -127,6 +136,13 @@ function paintBody(root, rows, d, tg) {
         지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
       <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
     </ul></div>`;
+  root.querySelectorAll(".np-more").forEach(b => b.onclick = () => {
+    const k = b.dataset.f, on = !unfolded.has(k);
+    on ? unfolded.add(k) : unfolded.delete(k);
+    root.querySelectorAll(`tr[data-p="${CSS.escape(k)}"]`).forEach(t => t.hidden = !on);
+    b.setAttribute("aria-expanded", on);
+    b.textContent = b.textContent.replace(/(보기 ▾|접기 ▴)$/, on ? "접기 ▴" : "보기 ▾");
+  });
 }
 
 // ---- 뽑기 ----
@@ -205,7 +221,7 @@ function mapRows(d) {
 function ticketRows(d, sc, now, rareNp) {
   const openMaps = new Set((sc?.sale || []).filter(e => openNow(e, now)).flatMap(e => e.maps));
   return d.tickets.map(t => ({
-    group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map),
+    group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map), fold: `m${t.map}`,
     sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도)" : ""}`,
     np: t.cat * catTicketNp(rareNp) + t.rare * rareNp, energy: t.energy,
   }));
@@ -247,19 +263,18 @@ function ticketGacha(d, sc, now, rareNp) {
 // 순위표: 티켓마다 가장 좋은 스테이지 한 줄 (지금 열린 스테이지가 있으면 그중에서)
 function eventRows(d, sc, now, tg) {
   const openMaps = new Set((sc?.sale || []).filter(e => openNow(e, now)).flatMap(e => e.maps));
-  const best = new Map();
+  const rows = [], seen = new Set();
   for (const s of d.gachaStages) for (const [tid, n] of Object.entries(s.t)) {
     const t = tg[tid];
-    if (!t?.np || !s.energy) continue;
-    const r = { tid, s, n, per: n / s.energy, open: openMaps.has(s.map) }, cur = best.get(tid);
-    if (!cur || (r.open && !cur.open) || (r.open === cur.open && r.per > cur.per)) best.set(tid, r);
-  }
-  return [...best.values()].map(({ tid, s, n, open }) => {
-    const t = tg[tid];
-    return { group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open,
+    // 같은 이름으로 다시 열린 맵(복각)은 번호만 다르고 스테이지가 같다 → 한 번만
+    const dup = `${s.name}|${s.stage}|${s.energy}|${n}|${tid}`;
+    if (!t?.np || !s.energy || seen.has(dup)) continue;
+    seen.add(dup);
+    rows.push({ group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${+n.toFixed(2)}장 × ${n2(t.np)}NP${t.est ? " (확률 추정)" : ""}`,
-      np: n * t.np, energy: s.energy };
-  });
+      np: n * t.np, energy: s.energy });
+  }
+  return rows;
 }
 function ticketPanel(d, tg) {
   const list = Object.entries(tg).sort((a, b) => (b[1].np ?? -1) - (a[1].np ?? -1));

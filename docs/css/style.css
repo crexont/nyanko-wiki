@@ -590,4 +590,7 @@ fieldset:disabled{opacity:.45}
 .np-tk td,.np-tk th{text-align:left;vertical-align:top}
 .np-tk td:first-child{min-width:150px;white-space:normal}
 .np-tk td:nth-child(3){min-width:260px;white-space:normal}
+.np-more{margin-top:4px;font:inherit;font-size:12px;color:var(--muted);background:none;border:1px dashed var(--line);border-radius:6px;padding:1px 7px;cursor:pointer}
+.np-more:hover{color:inherit}
+.np-table tr.np-sub td{opacity:.85}
 .np-how{margin:0;padding-left:18px;font-size:13.5px;line-height:1.75}
