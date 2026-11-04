@@ -288,6 +288,7 @@ const EVENT_RATES = {
   260: [10, 10], 196: [10, 10],  // 전설의 벌레 채집망 (여름 방학)
   216: [10, 10], 204: [10, 10],  // 전설의 트랩 (여름 방학 서바이벌)
   259: [8, 50],   // 전설의 돈다발 (여름 방학 파라다이스, 50회마다)
+  267: [5, 10],   // 파워 쿠키 (팩맨): 커뮤니티 영상 수치(통솔력 400당 2.71NP, 1스테·EX 10%)를 거꾸로 계산한 값
 };
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp
@@ -374,7 +375,7 @@ function ticketPanel(d, tg) {
       const st = stagesOf(tid);
       const spec = t.set.special.map(([, n, name]) => `${name} ${n}개`).join(", ");
       return `<tr${t.open ? ` class="boss"` : ""}>
-        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (나무위키)` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
+        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (${TICKET_NOTE[tid]?.[0] === "comm" ? "커뮤니티 역산" : "나무위키"})` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b>${t.manual ? `<br><small>자동 ${t.auto == null ? "-" : n2(t.auto)}</small>` : ""}</td>
         <td data-l="직접 입력"><input class="np-tin" type="number" min="0" step="0.01" data-tnp="${tid}" value="${t.manual ? opt.tNp[tid] : ""}" placeholder="자동"></td>
         <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${betText(d, tid)}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
@@ -402,7 +403,7 @@ const BASIS_STATUS = {
 };
 // 이벤트 뽑기 티켓별 메모 (출처 충돌·추정 근거)
 const TICKET_NOTE = {
-  267: ["est", "확률을 적어 둔 곳 없음. game8 공략팀 경험담(190연에 거의 확정 틀에서만 나옴)으로 보면 10%보다 낮을 수 있음"],
+  267: ["comm", "공개된 확률 없음. 커뮤니티 영상 수치(1스테·EX 10% 기준 통솔력 400당 2.71NP)를 거꾸로 계산한 값 (캐릭 2종 × 2.5%). game8 경험담(거의 확정 틀에서만 나옴)과도 맞음"],
   163: ["est", "일본 위키(seesaawiki): 캐릭 각 2.5% (일본판 4종 = 10%). 한국판 최신 세트는 3종"],
   215: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
   178: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
