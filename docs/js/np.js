@@ -10,7 +10,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 const KEY = "nyanko-wiki.np";
 const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
-  npRare: true, npBlue: true, npOrb: true, npXp: false, xpNp: 0.45, radarNp: 0, tNp: {}, exPct: null };
+  npRare: true, npBlue: true, npOrb: true, npXp: false, xpNp: 0.45, radarNp: 0, tNp: {}, exPct: null, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -52,6 +52,7 @@ export function renderNp(root) {
   root.innerHTML = `
     <p class="crumb"><a href="#/">냥코위키</a><i>/</i><span>NP효율</span></p>
     <div class="page-head"><div><h1>NP효율</h1><p>NP를 얻는 방법마다 통솔력·리더쉽·통조림 하나에 NP를 얼마나 얻는지 기대값으로 비교해요.</p></div></div>
+    <div class="row np-tabs" id="npTabs"></div>
     <div class="filters" id="npOpt"></div>
     <div id="npBody"><div class="empty">불러오는 중…</div></div>`;
   Promise.all([loadNp(), loadSchedule().catch(() => null)]).then(([d, sc]) => {
@@ -67,8 +68,11 @@ export function renderNp(root) {
       const tg = ticketGacha(d, sc, now, rareNp);
       const rows = [...gatyaRows(banners, rareNp, d.dupe), ...behRows(d), ...mapRows(d), ...ticketRows(d, sc, now, rareNp),
         ...eventRows(d, sc, now, tg), ...xpRows(d)];
-      paintOpt(root, d, rareRaw, draw);
-      paintBody(root, rows, d, tg, draw);
+      paintTabs(root, draw);
+      const optBox = root.querySelector("#npOpt");
+      optBox.style.display = opt.tab === "basis" ? "none" : "";  // .filters 의 display 가 hidden 속성을 덮어써서
+      if (opt.tab === "basis") root.querySelector("#npBody").innerHTML = basisHtml(d, tg, rareRaw);
+      else { paintOpt(root, d, rareRaw, draw); paintBody(root, rows, d, tg, draw); }
     };
     draw();
   }).catch(() => { root.querySelector("#npBody").innerHTML = `<div class="empty">데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
@@ -165,17 +169,7 @@ function paintBody(root, rows, d, tg, draw) {
       <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / 통솔력 ${unit("perEnergy")}당</th><th>NP / 통조림 ${unit("perCans")}당</th></tr></thead><tbody>
       ${list.map(r => tr(r, false) + r.more.map(m => tr(m, true)).join("")).join("")}
       </tbody></table></div></div>
-    ${ticketPanel(d, tg)}
-    <div class="panel"><h2>계산 방법</h2><ul class="np-how">
-      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `경험치 (100만 = ${opt.xpNp}NP)`, opt.radarNp > 0 && `트레저 레이더 (1개 = ${opt.radarNp}NP)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
-        꺼 둔 것은 NP 0으로 보고, NP가 0인 방법은 순위표에서 빠져요. 플래티넘 조각·리더쉽 같은 특별 아이템은 개수 제한이 있어서 넣지 않아요.</li>
-      <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
-      <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
-      <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
-      <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
-        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (${opt.exPct == null ? "게임 데이터 확률" : `모든 스테이지 ${opt.exPct}%`}). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
-      <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
-    </ul></div>`;
+    ${ticketPanel(d, tg)}`;
   root.querySelectorAll(".np-more").forEach(b => b.onclick = () => {
     const k = b.dataset.f, on = !unfolded.has(k);
     on ? unfolded.add(k) : unfolded.delete(k);
@@ -396,4 +390,81 @@ function xpRows(d) {
     group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
     sub: `${s.stage} — XP ${s.xp.toLocaleString()}`, np: xpNp(s.xp), energy: s.energy,
   }));
+}
+
+// ---- 계산 기준 탭: 계산에 쓰는 값마다 출처와 믿을 만한 정도를 한 표로 ----
+const BASIS_STATUS = {
+  ok: ["확정", "게임 데이터·서버 데이터이거나 나무위키 등과 맞춰 본 값"],
+  clash: ["출처 충돌", "출처마다 값이 달라서 하나를 골라 쓴 값"],
+  comm: ["커뮤니티", "게임 데이터에 없어서 커뮤니티 정리 값을 쓴 것"],
+  set: ["설정값", "순위 탭 설정에서 직접 바꾸는 값"],
+  est: ["추정", "확인된 값이 없어서 짐작한 값 — 찾으면 바꿔야 함"],
+};
+// 이벤트 뽑기 티켓별 메모 (출처 충돌·추정 근거)
+const TICKET_NOTE = {
+  267: ["est", "확률을 적어 둔 곳 없음. game8 공략팀 경험담(190연에 거의 확정 틀에서만 나옴)으로 보면 10%보다 낮을 수 있음"],
+  163: ["est", "일본 위키(seesaawiki): 캐릭 각 2.5% (일본판 4종 = 10%). 한국판 최신 세트는 3종"],
+  215: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
+  178: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
+  198: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
+  259: ["clash", "나무위키: 50회마다 확정 / 일본 위키(seesaawiki): 확정 틀 없음 → 나무위키 값"],
+};
+function basisHtml(d, tg, rareRaw) {
+  const rows = [
+    ["뽑기·중복", "중복 캐릭 NP", `기본 ${d.dupe[0]} · EX ${d.dupe[1]} · 레어 ${d.dupe[2]} · 슈레 ${d.dupe[3]} · 울슈레 ${d.dupe[4]} · 레전드 ${d.dupe[5]}`, "게임 데이터 (unitbuy 58열), 나무위키 본능 문서와 일치", "ok"],
+    ["뽑기·중복", "지금 열린 뽑기 확률", "배너마다 서버 값", "서버 일정 데이터 (gatya.tsv)", "ok"],
+    ["뽑기·중복", "레어 뽑기 종류별 기준 확률", RARE_KINDS.map(([, n, r]) => `${n} ${r.join("/")}`).join(" · "), "커뮤니티 정리 (축제는 열릴 때만 서버에 나옴)", "comm"],
+    ["뽑기·중복", "레어 티켓 1장", `NP ${n2(rareRaw)} (고른 뽑기 기준)`, "위 확률로 계산", "set"],
+    ["뽑기·중복", "냥코 뽑기 구성", "기본 캐릭 9 + 파란구슬 9 / 뽑기+(우주편 3장 뒤) 10 + 9, 중복 1NP / 2NP", "나무위키 뽑기·본능 문서", "ok"],
+    ["뽑기·중복", "파란구슬 → 레어 티켓", "5개 = 1장, 그 능력이 +10까지 다 올라가야 교환", "나무위키 자원 문서", "ok"],
+    ["럭키·이벤트", "럭키 티켓 1장", "꼬맹이 9종 각 3.7% → 0.33NP", "게임 데이터 구성 + 서버 확률, 나무위키 표와 일치", "ok"],
+    ["럭키·이벤트", "이벤트 뽑기에서 캐릭이 나오는 칸", "4번째 칸(울슈레 자리) = 한정 캐릭터", "게임 데이터 추론, 나무위키 확률표와 일치", "ok"],
+    ["럭키·이벤트", "이벤트 뽑기 확정 틀", "대부분 10회마다 한정 캐릭 1개 (고양이 농가 제외)", "나무위키 이벤트 뽑기 문서, game8", "ok"],
+    ["럭키·이벤트", "30회 특별 아이템 (레어 티켓·플래티넘 조각 등)", "NP에 안 넣음", "이벤트마다 개수 제한이 있어서 (사용자 결정)", "set"],
+    ["스테이지", "스테이지 드롭 확률", "스테이지마다", "게임 데이터, 나무위키 시즌·발굴·육성 스테이지 문서와 대조해 일치", "ok"],
+    ["스테이지", "EX 스테이지 출현율", opt.exPct == null ? "게임 데이터 값 (팩맨 1·2·3·4·5·7·10%)" : `모든 스테이지 ${opt.exPct}% (설정)`, "게임 데이터 (스테이지 파일 \"EX出現率\"). 나무위키·game8은 팩맨 \"약 10%\"", "clash"],
+    ["스테이지", "한탕 오락실", "10→11.7 · 30→32.5 · 100→125장", "게임 데이터, 나무위키와 일치", "ok"],
+    ["스테이지", "역습의 대갈이군 · 대역습의 메타쿠마", "열릴 때마다 1번만", "나무위키 육성 스테이지 문서 · 사용자 확인 (데이터 플래그로는 구분 안 됨)", "ok"],
+    ["본능옥·강습", "본능옥 분해 NP", `D ${d.gradeNp[0]} · C ${d.gradeNp[1]} · B ${d.gradeNp[2]} · A ${d.gradeNp[3]} · S ${d.gradeNp[4]}`, "게임 데이터 (equipmentgrade)", "ok"],
+    ["본능옥·강습", "강습 EX 출현 확률", "Lv.1 1% … Lv.MAX 기원 59.4 · 정점 30.6 · 비경 10%", "게임 데이터 (EX_group), 나무위키 강습 문서와 일치", "ok"],
+    ["환산", "리더쉽 1개", `통조림 ${opt.leaderCans} (통솔력 ${opt.maxEnergy} 채움)`, "설정", "set"],
+    ["환산", "경험치 → NP (사당)", `100만 = ${opt.xpNp}NP${opt.npXp ? "" : " (지금은 안 침)"}`, "커뮤니티 (500만당 약 2.25NP)", "comm"],
+    ["환산", "트레저 레이더 1개", `${opt.radarNp}NP`, "설정 (커뮤니티는 냥티 0.7장 ≈ 1.59NP로 치기도 함)", "set"],
+  ];
+  // 이벤트 뽑기 티켓별 (캐릭이 있는 것만)
+  for (const [tid, t] of Object.entries(tg)) {
+    if (!t.chars.length || t.kind !== "collab") continue;
+    const note = TICKET_NOTE[tid];
+    const status = t.open || (t.start && !t.est && !t.known) ? "ok" : t.manual ? "set" : note ? note[0] : t.known ? "ok" : "est";
+    const val = `${t.manual ? `직접 입력 ${opt.tNp[tid]}NP` : `한정 캐릭 ${t.rates[3][0] / 100}%${t.every ? `, ${t.every}회 확정` : ", 확정 없음"} → 1장 ${n2(t.np)}NP`}`;
+    const src = t.open || (t.start && !t.est && !t.known) ? "서버 일정 데이터" : note ? note[1] : t.known ? "나무위키 이벤트 뽑기 문서" : `확률 정보 없음 — 기본 ${opt.eventChar}%로 추정`;
+    if (!rows.some(r => r[1] === t.name && r[2] === val)) rows.push(["이벤트 뽑기", t.name, val, src, status]);  // 같은 이름 티켓(옛 맵·새 맵)은 한 줄
+  }
+  const order = { est: 0, clash: 1, comm: 2, set: 3, ok: 4 };
+  const count = Object.fromEntries(Object.keys(BASIS_STATUS).map(k => [k, rows.filter(r => r[4] === k).length]));
+  return `<div class="panel"><h2>계산 기준 <span class="ctl">${rows.length}개 · 추정 ${count.est} · 출처 충돌 ${count.clash}</span></h2>
+    <p class="np-note">NP효율 계산에 쓰는 값과 출처예요. 추정·출처 충돌이 먼저 나와요. 더 정확한 값을 알면 알려 주세요.</p>
+    <p class="np-legend">${Object.entries(BASIS_STATUS).map(([k, [n, t]]) => `<span class="np-st np-st-${k}" title="${esc(t)}">${n}</span> ${esc(t)}`).join("<br>")}</p>
+    <div class="table-wrap"><table class="en-table np-table np-tk np-basis"><thead><tr><th>상태</th><th>분류</th><th>항목</th><th>쓰는 값</th><th>출처</th></tr></thead><tbody>
+    ${rows.sort((a, b) => order[a[4]] - order[b[4]]).map(([g, name, val, src, st]) => `<tr>
+      <td data-l="상태"><span class="np-st np-st-${st}">${BASIS_STATUS[st][0]}</span></td>
+      <td data-l="분류"><small>${esc(g)}</small></td><td class="en-name" data-l="항목">${esc(name)}</td>
+      <td data-l="쓰는 값"><small>${esc(val)}</small></td><td data-l="출처"><small>${esc(src)}</small></td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div class="panel"><h2>계산 방법</h2><ul class="np-how">
+      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `경험치 (100만 = ${opt.xpNp}NP)`, opt.radarNp > 0 && `트레저 레이더 (1개 = ${opt.radarNp}NP)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
+        꺼 둔 것은 NP 0으로 보고, NP가 0인 방법은 순위표에서 빠져요. 플래티넘 조각·리더쉽 같은 특별 아이템은 개수 제한이 있어서 넣지 않아요.</li>
+      <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
+      <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
+      <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
+      <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
+        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (${opt.exPct == null ? "게임 데이터 확률" : `모든 스테이지 ${opt.exPct}%`}). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
+      <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
+    </ul></div>`;
+}
+function paintTabs(root, draw) {
+  const box = root.querySelector("#npTabs");
+  box.innerHTML = [["rank", "순위"], ["basis", "계산 기준"]].map(([k, l]) =>
+    `<button class="chip" data-tab="${k}" aria-pressed="${opt.tab === k}">${l}</button>`).join("");
+  box.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { opt.tab = b.dataset.tab; save(); draw(); });
 }
