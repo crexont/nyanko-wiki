@@ -8,7 +8,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";
-const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10 };
+const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100 };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -70,6 +70,8 @@ function paintOpt(root, d, rareNp, draw) {
   const num = (k, label, step = 1) => `<label class="np-in"><span>${label}</span><input type="number" min="1" step="${step}" data-k="${k}" value="${opt[k]}"></label>`;
   box.innerHTML = `
     <div class="row np-opts">
+      ${num("perEnergy", "비교 기준 통솔력")}
+      ${num("perCans", "비교 기준 통조림")}
       ${num("maxEnergy", "최대 통솔력")}
       ${num("leaderCans", "리더쉽 1개 = 통조림")}
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
@@ -107,7 +109,7 @@ function paintBody(root, rows, d, tg) {
   const cpe = opt.leaderCans / opt.maxEnergy;  // 통솔력 1 = 통조림
   const calc = r => {
     const cans = (r.energy || 0) * cpe + (r.cans || 0), energy = (r.energy || 0) + (r.cans || 0) / cpe;
-    return { ...r, c100: r.np / cans * 100, e100: r.np / energy * 100, lead: r.np / energy * opt.maxEnergy };
+    return { ...r, c100: r.np / cans * opt.perCans, e100: r.np / energy * opt.perEnergy };
   };
   const sorted = rows.filter(r => opt.group === "all" || r.group === opt.group).map(calc).sort((a, b) => b.c100 - a.c100);
   // 같은 맵(fold 키)의 스테이지는 가장 좋은 것 하나만 보이고 나머지는 접어 둔다
@@ -117,14 +119,15 @@ function paintBody(root, rows, d, tg) {
     if (h) h.more.push(r); else heads.set(r.fold || Symbol(), { ...r, more: [] });
   }
   const list = [...heads.values()];
+  const E = `통솔력 ${opt.perEnergy}당`, C = `통조림 ${opt.perCans}당`;
   const cost = r => [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
   const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
         <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
-        <td data-l="1회 NP">${n2(r.np)}</td><td data-l="비용">${cost(r)}</td>
-        <td data-l="100통솔력당">${n2(r.e100)}</td><td data-l="리더쉽당">${n2(r.lead)}</td><td data-l="100통조림당"><b>${n2(r.c100)}</b></td></tr>`;
+        <td data-l="비용">${cost(r)}</td>
+        <td data-l="${E}">${n2(r.e100)}</td><td data-l="${C}"><b>${n2(r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
-    <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · 100통조림당 순</span></h2>
-      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>1회 NP</th><th>비용</th><th>100통솔력당</th><th>리더쉽당</th><th>100통조림당</th></tr></thead><tbody>
+    <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · NP / ${C} 순</span></h2>
+      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / ${E}</th><th>NP / ${C}</th></tr></thead><tbody>
       ${list.map(r => tr(r, false) + r.more.map(m => tr(m, true)).join("")).join("")}
       </tbody></table></div></div>
     ${ticketPanel(d, tg)}
@@ -292,7 +295,7 @@ function ticketPanel(d, tg) {
         <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : grades}${t.est || t.open ? "" : ` · ${t.start.slice(5, 10).replace("-", "/")} 시작`}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b></td>
         <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
-        <td data-l="드롭 스테이지"><small>${st.length ? `${st.length}곳 · 최고 100통솔력당 ${n2(st[0].t[tid] / st[0].energy * 100)}장 (<a href="#/stage/${st[0].map}/${st[0].i}">${esc(st[0].name)} ${esc(st[0].stage)}</a>)` : "-"}</small></td></tr>`;
+        <td data-l="드롭 스테이지"><small>${st.length ? `${st.length}곳 · 최고 통솔력 ${opt.perEnergy}당 ${n2(st[0].t[tid] / st[0].energy * opt.perEnergy)}장 (<a href="#/stage/${st[0].map}/${st[0].i}">${esc(st[0].name)} ${esc(st[0].stage)}</a>)` : "-"}</small></td></tr>`;
     }).join("")}
     </tbody></table></div></div>`;
 }
