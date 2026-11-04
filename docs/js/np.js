@@ -91,7 +91,7 @@ function paintOpt(root, d, rareNp, draw) {
     <div class="row np-opts">
       <span class="np-lab">NP로 칠 것</span>
       ${[["npRare", "레어 티켓 뽑기", "레어 티켓을 뽑아서 나온 캐릭을 전부 NP로. 새 캐릭이거나 +레벨이 덜 찼으면 실제로는 NP가 안 되니, 그럴 땐 끄세요 (레어 티켓 0NP)"],
-        ["npBlue", "파란구슬 → 레어 티켓", "냥코 뽑기 파란구슬 5개를 레어 티켓으로 바꿔 뽑기 (레어 티켓 뽑기가 켜져 있어야 의미 있음)"],
+        ["npBlue", "파란구슬 → 레어 티켓", "냥코 뽑기 파란구슬 5개를 레어 티켓으로 바꿔 뽑기. 그 파란구슬 능력이 +10까지 다 올라가 있어야 바꿀 수 있어요 (레어 티켓 뽑기가 켜져 있어야 의미 있음)"],
         ["npOrb", "본능옥 분해", "강습·지도에서 나온 본능옥을 전부 NP로 (끄면 강습·지도는 0)"],
         ["npXp", "경험치", "스테이지 클리어 경험치·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"]].map(([k, l, t]) =>
         `<button class="chip" data-t="${k}" aria-pressed="${opt[k]}" title="${t}">${l}</button>`).join("")}
@@ -161,7 +161,7 @@ function paintBody(root, rows, d, tg, draw) {
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
       <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
       <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
-        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
+        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
       <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
     </ul></div>`;
   root.querySelectorAll(".np-more").forEach(b => b.onclick = () => {
@@ -268,6 +268,7 @@ function ticketRows(d, sc, now, rareNp) {
 // ---- 이벤트 뽑기·럭키 뽑기 (전용 티켓) ----
 // np.json gacha: 티켓 → 세트("normal:62"·"collab:54") → entries [등급 칸, 칸 수, 캐릭(-1), 아이템(-1), 중복 NP]
 const GRADE = { normal: ["노멀", "대박", "초 대박", "슈퍼 대박", "레전드"], collab: ["노멀", "대박", "초 대박", "한정 캐릭터", "레전드"] };
+const NO_GUARANTEE = new Set([381]);  // 고양이 농가: 10회 확정에서 빠지고 랜덤으로만 나옴
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp
   : e[3] === RADAR ? opt.radarNp : xpNp(XP_ITEMS[e[3]]);
@@ -295,7 +296,11 @@ function ticketGacha(d, sc, now, rareNp) {
     const set = g.sets[key], kind = key.split(":")[0];
     const k = known.get(key);
     const rates = k?.rates || (kind === "collab" ? [[0, 0], [0, 0], [0, 0], [opt.eventChar * 100, 0], [0, 0]] : null);
-    const auto = rates ? setNp(set, rates, rareNp) : null, manual = opt.tNp[tid];
+    // 이벤트 뽑기는 10번마다 한정 캐릭 하나가 확정 (나무위키 이벤트 뽑기 문서, 고양이 농가는 확정에서 빠짐)
+    const pool = kind === "collab" ? set.entries.filter(e => e[2] >= 0 && !NO_GUARANTEE.has(e[2])) : [];
+    const sure = pool.length ? pool.reduce((a, e) => a + e[4], 0) / pool.length : null;
+    const base = rates ? setNp(set, rates, rareNp) : null;
+    const auto = base == null ? null : sure == null ? base : base * 0.9 + sure * 0.1, manual = opt.tNp[tid];
     out[tid] = { name: g.name, kind, set, rates, open: !!k?.open, start: k?.start, est: !k, auto, manual: manual != null,
       np: manual ?? auto, chars: set.entries.filter(e => e[2] >= 0) };
   }
