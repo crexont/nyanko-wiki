@@ -31,6 +31,8 @@ LIMITED = 3          # 이벤트 뽑기에서 캐릭이 나오는 등급 칸 (�
 EX_MAPS = range(25033, 25051)
 # 재회의 지도: 복귀 유저에게만 주는 지도라 비교에서 뺀다 (사용자 결정)
 SKIP_MAPS = {25070, 25071, 25072}
+# 1회 한정 보상이지만 열릴 때마다 다시 받을 수 있는 맵 (대역습의 메타쿠마: 비정기, 냥코 티켓 5장 확정)
+OPEN_ONCE = {1173}
 
 
 def stage_files(out_dir: str):
@@ -259,7 +261,8 @@ def main(argv: list[str] | None = None) -> None:
         if code == "B" or mid in SKIP_MAPS:
             continue
         for st in m["stages"]:
-            d = repeat_drops(st)
+            # 열릴 때마다 새로 깰 수 있는 1회 보상 스테이지 (메타쿠마): 첫 보상도 센다
+            d = [x for x in st.get("drop") or [] if x[2]] if mid in OPEN_ONCE else repeat_drops(st)
             cat = sum(n * p / 100 for item, n, p in d if item == CAT_TICKET)
             rare = sum(n * p / 100 for item, n, p in d if item == RARE_TICKET)
             if cat or rare:

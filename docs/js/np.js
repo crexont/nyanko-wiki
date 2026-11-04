@@ -267,7 +267,7 @@ function mapRows(d) {
 
 // ---- 냥코 티켓·레어 티켓 스테이지 ----
 // 열릴 때마다 한 번만 깰 수 있는 스테이지 (데이터 플래그로는 구분이 안 돼서 나무위키 기준으로 적는다)
-const ONCE_PER_OPEN = { 1078: "열릴 때마다 1번만 (6.7.0부터, 한 달 약 10번)" };
+const ONCE_PER_OPEN = { 1078: "열릴 때마다 1번만 (6.7.0부터, 한 달 약 10번)", 1173: "비정기, 열릴 때마다 1번만" };
 function ticketRows(d, sc, now, rareNp) {
   const openMaps = new Set((sc?.sale || []).filter(e => openNow(e, now)).flatMap(e => e.maps));
   return d.tickets.map(t => ({
