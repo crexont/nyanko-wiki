@@ -281,6 +281,18 @@ function ticketRows(d, sc, now, rareNp) {
 // np.json gacha: 티켓 → 세트("normal:62"·"collab:54") → entries [등급 칸, 칸 수, 캐릭(-1), 아이템(-1), 중복 NP]
 const GRADE = { normal: ["노멀", "대박", "초 대박", "슈퍼 대박", "레전드"], collab: ["노멀", "대박", "초 대박", "한정 캐릭터", "레전드"] };
 const NO_GUARANTEE = new Set([381]);  // 고양이 농가: 10회 확정에서 빠지고 랜덤으로만 나옴
+// 지금 일정에 없는 이벤트 뽑기의 한정 캐릭터 칸 확률(%)과 확정 주기(N회마다 한정 캐릭 1개, 0 = 없음).
+// 출처: 나무위키 "냥코 대전쟁/캐릭터/EX/이벤트 뽑기" (2026-11-05 확인). 열려 있으면 서버 확률을 쓴다
+const EVENT_RATES = {
+  231: [10, 10],  // 전설의 저스티스 (냥코레인저)
+  270: [15, 0],   // 전설의 반짝임 (다운로드 기념, 30회마다 특별 아이템만)
+  235: [10, 10],  // 전설의 복주머니 (설날)
+  242: [15, 10],  // 전설의 러브레터 (두근두근 냥코 학교)
+  255: [10, 10],  // 전설의 성수 (악마의 준 브라이드)
+  260: [10, 10], 196: [10, 10],  // 전설의 벌레 채집망 (여름 방학)
+  216: [10, 10], 204: [10, 10],  // 전설의 트랩 (여름 방학 서바이벌)
+  259: [8, 50],   // 전설의 돈다발 (여름 방학 파라다이스, 50회마다)
+};
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp
   : e[3] === RADAR ? opt.radarNp : xpNp(XP_ITEMS[e[3]]);
@@ -307,13 +319,16 @@ function ticketGacha(d, sc, now, rareNp) {
     const key = hit || keys.sort((a, b) => b.split(":")[1] - a.split(":")[1])[0];  // 없으면 가장 최근 세트
     const set = g.sets[key], kind = key.split(":")[0];
     const k = known.get(key);
-    const rates = k?.rates || (kind === "collab" ? [[0, 0], [0, 0], [0, 0], [opt.eventChar * 100, 0], [0, 0]] : null);
+    const wiki = !k && kind === "collab" ? EVENT_RATES[tid] : null;
+    const slot = wiki ? wiki[0] : opt.eventChar;
+    const rates = k?.rates || (kind === "collab" ? [[0, 0], [0, 0], [0, 0], [slot * 100, 0], [0, 0]] : null);
+    const every = kind === "collab" ? (EVENT_RATES[tid]?.[1] ?? 10) : 0;
     // 이벤트 뽑기는 10번마다 한정 캐릭 하나가 확정 (나무위키 이벤트 뽑기 문서, 고양이 농가는 확정에서 빠짐)
     const pool = kind === "collab" ? set.entries.filter(e => e[2] >= 0 && !NO_GUARANTEE.has(e[2])) : [];
     const sure = pool.length ? pool.reduce((a, e) => a + e[4], 0) / pool.length : null;
     const base = rates ? setNp(set, rates, rareNp) : null;
-    const auto = base == null ? null : sure == null ? base : base * 0.9 + sure * 0.1, manual = opt.tNp[tid];
-    out[tid] = { name: g.name, kind, set, rates, open: !!k?.open, start: k?.start, est: !k, auto, manual: manual != null,
+    const auto = base == null ? null : sure == null || !every ? base : base * (every - 1) / every + sure / every, manual = opt.tNp[tid];
+    out[tid] = { name: g.name, kind, set, rates, open: !!k?.open, start: k?.start, est: !k && !wiki, known: !!wiki, every, auto, manual: manual != null,
       np: manual ?? auto, chars: set.entries.filter(e => e[2] >= 0) };
   }
   return out;
@@ -355,7 +370,7 @@ function ticketPanel(d, tg) {
       const st = stagesOf(tid);
       const spec = t.set.special.map(([, n, name]) => `${name} ${n}개`).join(", ");
       return `<tr${t.open ? ` class="boss"` : ""}>
-        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : grades}${t.est || t.open ? "" : ` · ${t.start.slice(5, 10).replace("-", "/")} 시작`}</small></td>
+        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (나무위키)` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b>${t.manual ? `<br><small>자동 ${t.auto == null ? "-" : n2(t.auto)}</small>` : ""}</td>
         <td data-l="직접 입력"><input class="np-tin" type="number" min="0" step="0.01" data-tnp="${tid}" value="${t.manual ? opt.tNp[tid] : ""}" placeholder="자동"></td>
         <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${betText(d, tid)}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
