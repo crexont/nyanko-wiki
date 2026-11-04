@@ -23,6 +23,7 @@ from build_stages import SKIP_FILES
 ORB = 30000          # 보상 아이템 번호 - ORB = 본능옥 번호
 CAT_TICKET, RARE_TICKET = 20, 21
 DRINK_A = 55
+LIMITED = 3          # 이벤트 뽑기에서 캐릭이 나오는 등급 칸 (울슈레 자리 = 한정 캐릭터)
 # 강습 EX 스테이지 (기원·정점·비경 × 6속성). 같은 이름의 지도 스테이지(25009~)와 드롭이 달라서 번호로 고른다.
 EX_MAPS = range(25033, 25051)
 # 재회의 지도: 복귀 유저에게만 주는 지도라 비교에서 뺀다 (사용자 결정)
@@ -41,6 +42,68 @@ def repeat_drops(st: dict) -> list:
     if st.get("dropOnce"):
         d = d[1:]
     return [x for x in d if x[2]]
+
+
+def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
+    """전용 티켓으로 돌리는 뽑기(럭키 뽑기·이벤트 뽑기)의 구성과, 그 티켓을 반복해서 얻는 스테이지.
+
+    뽑기 세트 = GatyaData_Option_Set{N,E}.tsv 줄 (ItemID_Ticket = 스테이지 드롭 아이템 번호와 같음).
+    캐릭 = GatyaDataSet{N,E}1.csv, 아이템 = GatyaDataSet{N,E}3.csv (같은 번호가 여러 번 = 그만큼 잘 나옴).
+    등급 = 아이템은 Gatyaitembuy 0열 Rarity → 서버 확률 [노멀, 레어, 슈레, 울슈레, 레전드] 순서.
+    캐릭은 럭키 뽑기(N)면 unitbuy 13열 레어도 (74/21/5%와 나무위키 표의 칸별 확률 3.7%·7%·5%가 일치),
+    이벤트 뽑기(E)면 4번째 칸 = "한정 캐릭터" 등급 (나무위키 설날 뽑기 표, 이벤트 뽑기 아이템 중 Rarity 3이 하나도 없음).
+    확률은 서버 이벤트 데이터(일정)에만 있어서 사이트가 일정 데이터에서 세트 번호로 찾는다.
+    특별 아이템(EventGatyaMedamaItem.json, 30회마다 확정·개수 제한)은 따로 적어 둔다.
+    """
+    def rows(name):
+        return [[int(x) for x in l.split(",") if x.strip() and int(x) >= 0] for l in read(os.path.join(D, name))]
+
+    ub = [l.split(",") for l in read(os.path.join(D, "unitbuy.csv"))]
+    item_rarity = [int(l.split(",")[0]) for l in read(os.path.join(D, "Gatyaitembuy.csv"))[1:] if l.strip()]
+    medama = json.load(open(os.path.join(D, "EventGatyaMedamaItem.json"), encoding="utf-8"))["GatyaID"]
+    gi = [l.split(",") for l in read(os.path.join(D, "Gatyaitembuy.csv"))[1:] if l.strip()]
+    XP_ITEMS = {i for i, r in enumerate(gi) if r[8].strip() == "6"}  # srcItemID 6 = XP
+    names = json.load(open(os.path.join(SITE, "data", "stages", "index.json"), encoding="utf-8"))["items"]
+
+    gacha = {}  # 티켓 아이템 → {name, sets: {"kind:세트": {...}}}
+    for kind, letter in (("normal", "N"), ("collab", "E")):
+        chars, items = rows(f"GatyaDataSet{letter}1.csv"), rows(f"GatyaDataSet{letter}3.csv")
+        opt = read(os.path.join(D, f"GatyaData_Option_Set{letter}.tsv"))[1:]
+        for line in opt:
+            r = line.split("\t")
+            sid, ticket = int(r[0]), int(r[2])
+            # 냥코 티켓·레어 티켓·통조림 뽑기는 따로 계산한다. 드롭 스테이지가 없는 티켓(옛 이벤트)도 뺀다
+            if ticket in (CAT_TICKET, RARE_TICKET) or not names.get(str(ticket)):
+                continue
+            entries = []  # [등급, 칸 수, 캐릭 번호 or -1, 아이템 번호 or -1, 중복 NP]
+            for cid, n in collections.Counter(chars[sid] if sid < len(chars) else []).items():
+                grade = int(ub[cid][13]) if kind == "normal" else LIMITED
+                entries.append([grade, n, cid, -1, int(ub[cid][58])])
+            for iid, n in collections.Counter(items[sid] if sid < len(items) else []).items():
+                entries.append([item_rarity[iid], n, -1, iid, 0])
+            if not entries:
+                continue
+            g = gacha.setdefault(str(ticket), {"name": names[str(ticket)], "sets": {}})
+            g["sets"][f"{kind}:{sid}"] = {
+                "entries": entries,
+                "special": [[d["id"], d["value"], names.get(str(d["id"])) or ("XP" if d["id"] in XP_ITEMS else f"아이템 {d['id']}")]
+                            for d in medama.get(str(sid), {}).get("data", [])]
+                if kind == "collab" else [],
+            }
+
+    stages = []
+    for mid, (code, m) in sorted(maps.items()):
+        if code == "B" or mid in SKIP_MAPS:
+            continue
+        for st in m["stages"]:
+            got = collections.Counter()
+            for item, n, p in repeat_drops(st):
+                if str(item) in gacha:
+                    got[str(item)] += n * p / 100
+            if got:
+                stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"),
+                               "t": {k: round(v, 3) for k, v in got.items()}})
+    return gacha, stages
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -135,6 +198,8 @@ def main(argv: list[str] | None = None) -> None:
                 tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"),
                                 "cat": round(cat, 3), "rare": round(rare, 3)})
 
+    gacha, gacha_stages = ticket_gacha(D, maps)
+
     drink = None
     rows = read(os.path.join(D, "itemShopData.tsv"))
     head = rows[0].split("\t")
@@ -144,12 +209,14 @@ def main(argv: list[str] | None = None) -> None:
             drink = int(r["ItemPrice"]) / int(r["ItemValue"])
 
     data = {"dupe": dupe, "gradeNp": grade_np, "exNp": ex_np, "drinkA": drink,
-            "behemoth": beh_out, "orbMaps": orb_maps, "tickets": tickets}
+            "behemoth": beh_out, "orbMaps": orb_maps, "tickets": tickets,
+            "gacha": gacha, "gachaStages": gacha_stages}
     out = os.path.join(SITE, "data", "np.json")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{out}: 중복 NP {dupe}, 본능옥 NP {grade_np}, EX {ex_np}, 강습 {len(beh_out)}개, "
-          f"본능옥 스테이지 {len(orb_maps)}개, 티켓 스테이지 {len(tickets)}개, 드링크 A {drink}통조림")
+          f"본능옥 스테이지 {len(orb_maps)}개, 티켓 스테이지 {len(tickets)}개, 드링크 A {drink}통조림, "
+          f"티켓 뽑기 {len(gacha)}종, 티켓 뽑기 스테이지 {len(gacha_stages)}개")
 
 
 if __name__ == "__main__":

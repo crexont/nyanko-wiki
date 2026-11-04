@@ -1,6 +1,6 @@
 // NP효율 — NP를 얻는 방법(뽑기·강습·지도·티켓 스테이지)마다 통솔력·리더쉽·통조림 하나당 NP를 비교한다.
 // 게임 데이터 값은 tools/build_np.py 가 만든 data/np.json, 뽑기 확률은 일정 데이터(서버 이벤트)에서.
-import { esc } from "./common.js";
+import { esc, BYID } from "./common.js";
 import { loadSchedule, openNow } from "./schedule.js";
 
 let npPromise;
@@ -8,7 +8,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";
-const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all" };
+const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10 };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -32,7 +32,7 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } cat
 const RATE_RARITY = [0, 2, 3, 4, 5];  // 뽑기 확률 순서 [노멀, 레어, 슈레, 울슈레, 레전드] → 레어도 (np.json dupe 순서)
 const BASE_RATES = [[0, 0], [7000, 0], [2500, 0], [500, 0], [0, 0]];  // 일정 데이터가 없을 때 레어 티켓 기준
 const TIERS = ["기원", "정점", "비경"];
-const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지" };
+const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", event: "이벤트·럭키 티켓" };
 
 const pullNp = (rates, dupe) => rates.reduce((s, [p], i) => s + p / 1e4 * dupe[RATE_RARITY[i]], 0);
 const n2 = x => x.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -53,9 +53,10 @@ export function renderNp(root) {
       const kind = RARE_KINDS.find(([k]) => k === opt.rareBase);
       const rareNp = kind ? pullNp(kindRates(kind[2]), d.dupe)
         : Math.max(pullNp(BASE_RATES, d.dupe), ...banners.filter(b => b.open && b.price === 150).map(b => b.np));
-      const rows = [...gatyaRows(banners, rareNp, d.dupe), ...behRows(d), ...mapRows(d), ...ticketRows(d, sc, now, rareNp)];
+      const tg = ticketGacha(d, sc, now, rareNp);
+      const rows = [...gatyaRows(banners, rareNp, d.dupe), ...behRows(d), ...mapRows(d), ...ticketRows(d, sc, now, rareNp), ...eventRows(d, sc, now, tg)];
       paintOpt(root, d, rareNp, draw);
-      paintBody(root, rows, d);
+      paintBody(root, rows, d, tg);
     };
     draw();
   }).catch(() => { root.querySelector("#npBody").innerHTML = `<div class="empty">데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
@@ -75,6 +76,7 @@ function paintOpt(root, d, rareNp, draw) {
       <label class="np-in"><span>레어 티켓 쓰는 뽑기</span><select data-k="rareBase"><option value="auto">자동 (지금 열린 배너 중 최고)</option>${RARE_KINDS.map(([k, name, r]) =>
         `<option value="${k}"${k === opt.rareBase ? " selected" : ""}>${name}  (${r.join(" / ")})</option>`).join("")}</select></label>
       <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
+      <label class="np-in" title="확률이 서버 데이터에 없는(지금 안 열린) 이벤트 뽑기에서 한정 캐릭터가 나올 확률"><span>지난 이벤트 뽑기 한정 캐릭 %</span><input type="number" min="0" max="100" step="0.1" data-k="eventChar" value="${opt.eventChar}"></label>
       <label class="np-in"><span>강습 레벨</span><select data-k="lv">${beh.map(s =>
         `<option value="${s.i}"${s.i === opt.lv ? " selected" : ""}>${s.i === beh.length - 1 ? "Lv.MAX" : `Lv.${s.i + 1}`}</option>`).join("")}</select></label>
     </div>
@@ -90,7 +92,7 @@ function paintOpt(root, d, rareNp, draw) {
     const k = el.dataset.k, v = +el.value;
     if (k === "catPlus") opt.catPlus = v === 1;
     else if (k === "rareBase") opt.rareBase = el.value;
-    else if (v > 0 || (k === "lv" && v >= 0)) opt[k] = v;
+    else if (v > 0 || ((k === "lv" || k === "eventChar") && v >= 0)) opt[k] = v;
     save();
     draw();
   });
@@ -100,7 +102,7 @@ function paintOpt(root, d, rareNp, draw) {
 
 // ---- 표 ----
 // 행 = { group, name, sub, href, np(1회), energy(통솔력), cans(통조림), open }
-function paintBody(root, rows, d) {
+function paintBody(root, rows, d, tg) {
   const cpe = opt.leaderCans / opt.maxEnergy;  // 통솔력 1 = 통조림
   const calc = r => {
     const cans = (r.energy || 0) * cpe + (r.cans || 0), energy = (r.energy || 0) + (r.cans || 0) / cpe;
@@ -116,10 +118,13 @@ function paintBody(root, rows, d) {
         <td data-l="1회 NP">${n2(r.np)}</td><td data-l="비용">${cost(r)}</td>
         <td data-l="100통솔력당">${n2(r.e100)}</td><td data-l="리더쉽당">${n2(r.lead)}</td><td data-l="100통조림당"><b>${n2(r.c100)}</b></td></tr>`).join("")}
       </tbody></table></div></div>
+    ${ticketPanel(d, tg)}
     <div class="panel"><h2>계산 방법</h2><ul class="np-how">
       <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
       <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
+      <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
+        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
       <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
     </ul></div>`;
 }
@@ -204,4 +209,75 @@ function ticketRows(d, sc, now, rareNp) {
     sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도)" : ""}`,
     np: t.cat * catTicketNp(rareNp) + t.rare * rareNp, energy: t.energy,
   }));
+}
+
+// ---- 이벤트 뽑기·럭키 뽑기 (전용 티켓) ----
+// np.json gacha: 티켓 → 세트("normal:62"·"collab:54") → entries [등급 칸, 칸 수, 캐릭(-1), 아이템(-1), 중복 NP]
+const GRADE = { normal: ["노멀", "대박", "초 대박", "슈퍼 대박", "레전드"], collab: ["노멀", "대박", "초 대박", "한정 캐릭터", "레전드"] };
+const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp : 0;
+function setNp(set, rates, rareNp) {
+  return rates.reduce((np, [p], g) => {
+    const es = set.entries.filter(e => e[0] === g), w = es.reduce((a, e) => a + e[1], 0);
+    return w ? np + p / 1e4 * es.reduce((a, e) => a + e[1] * entryNp(e, rareNp), 0) / w : np;
+  }, 0);
+}
+function ticketGacha(d, sc, now, rareNp) {
+  const known = new Map();  // "종류:세트" → 일정 데이터의 확률 (지금 열린 것 우선)
+  for (const e of sc?.gatya || []) {
+    if (e.end && Date.parse(e.end) <= now) continue;
+    const open = Date.parse(e.start || 0) <= now;
+    for (const s of e.sets) {
+      const key = `${e.kind}:${s.id}`, cur = known.get(key);
+      if (s.id >= 0 && (!cur || (open && !cur.open))) known.set(key, { rates: s.rates, open, start: e.start });
+    }
+  }
+  const out = {};
+  for (const [tid, g] of Object.entries(d.gacha)) {
+    const keys = Object.keys(g.sets);
+    const hit = keys.filter(k => known.has(k)).sort((a, b) => known.get(b).open - known.get(a).open)[0];
+    const key = hit || keys.sort((a, b) => b.split(":")[1] - a.split(":")[1])[0];  // 없으면 가장 최근 세트
+    const set = g.sets[key], kind = key.split(":")[0];
+    const k = known.get(key);
+    const rates = k?.rates || (kind === "collab" ? [[0, 0], [0, 0], [0, 0], [opt.eventChar * 100, 0], [0, 0]] : null);
+    out[tid] = { name: g.name, kind, set, rates, open: !!k?.open, start: k?.start, est: !k,
+      np: rates ? setNp(set, rates, rareNp) : null, chars: set.entries.filter(e => e[2] >= 0) };
+  }
+  return out;
+}
+// 순위표: 티켓마다 가장 좋은 스테이지 한 줄 (지금 열린 스테이지가 있으면 그중에서)
+function eventRows(d, sc, now, tg) {
+  const openMaps = new Set((sc?.sale || []).filter(e => openNow(e, now)).flatMap(e => e.maps));
+  const best = new Map();
+  for (const s of d.gachaStages) for (const [tid, n] of Object.entries(s.t)) {
+    const t = tg[tid];
+    if (!t?.np || !s.energy) continue;
+    const r = { tid, s, n, per: n / s.energy, open: openMaps.has(s.map) }, cur = best.get(tid);
+    if (!cur || (r.open && !cur.open) || (r.open === cur.open && r.per > cur.per)) best.set(tid, r);
+  }
+  return [...best.values()].map(({ tid, s, n, open }) => {
+    const t = tg[tid];
+    return { group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open,
+      sub: `${s.stage} — ${t.name} ${+n.toFixed(2)}장 × ${n2(t.np)}NP${t.est ? " (확률 추정)" : ""}`,
+      np: n * t.np, energy: s.energy };
+  });
+}
+function ticketPanel(d, tg) {
+  const list = Object.entries(tg).sort((a, b) => (b[1].np ?? -1) - (a[1].np ?? -1));
+  if (!list.length) return "";
+  const stagesOf = tid => d.gachaStages.filter(s => s.t[tid] && s.energy).sort((a, b) => b.t[tid] / b.energy - a.t[tid] / a.energy);
+  return `<div class="panel"><h2>이벤트·럭키 티켓 1장 = NP <span class="ctl">${list.length}종</span></h2>
+    <div class="table-wrap"><table class="en-table np-table np-tk"><thead><tr><th>티켓</th><th>1장 NP</th><th>나오는 캐릭</th><th>드롭 스테이지</th></tr></thead><tbody>
+    ${list.map(([tid, t]) => {
+      const g = GRADE[t.kind];
+      const grades = t.rates ? t.rates.map(([p], i) => p ? `${g[i]} ${p / 100}%` : "").filter(Boolean).join(" · ") : "";
+      const chars = t.chars.map(e => BYID.get(e[2])?.forms[0].name || `#${e[2]}`);
+      const st = stagesOf(tid);
+      const spec = t.set.special.map(([, n, name]) => `${name} ${n}개`).join(", ");
+      return `<tr${t.open ? ` class="boss"` : ""}>
+        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : grades}${t.est || t.open ? "" : ` · ${t.start.slice(5, 10).replace("-", "/")} 시작`}</small></td>
+        <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b></td>
+        <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${spec ? `<br>특별 아이템: ${esc(spec)}` : ""}</small></td>
+        <td data-l="드롭 스테이지"><small>${st.length ? `${st.length}곳 · 최고 100통솔력당 ${n2(st[0].t[tid] / st[0].energy * 100)}장 (<a href="#/stage/${st[0].map}/${st[0].i}">${esc(st[0].name)} ${esc(st[0].stage)}</a>)` : "-"}</small></td></tr>`;
+    }).join("")}
+    </tbody></table></div></div>`;
 }
