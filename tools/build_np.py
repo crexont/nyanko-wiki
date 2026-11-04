@@ -18,7 +18,7 @@ import json
 import os
 
 from build_gamedata import SITE, game_data_dir, read
-from build_stages import SKIP_FILES
+from build_stages import CATEGORIES, SKIP_FILES, data_lines, ints, parse_reward
 
 ORB = 30000          # 보상 아이템 번호 - ORB = 본능옥 번호
 XP_DROP = 6          # 스테이지 보상 6 = XP (개수 = XP 양)
@@ -53,6 +53,30 @@ def repeat_drops(st: dict) -> list:
 def stage_xp(st: dict) -> int:
     """한 번 클리어할 때 XP 기대값: 클리어 경험치(보물·아이템 보너스 전) + XP 드롭."""
     return round((st.get("xp") or 0) + sum(n * p / 100 for i, n, p in repeat_drops(st) if i == XP_DROP))
+
+
+def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, list] | None:
+    """스테이지를 깬 뒤 나올 수 있는 EX 스테이지: (출현 확률 %, [EX 스테이지 보상 dict…]).
+
+    stage<코드><맵>_<스테이지>.csv 첫 줄 = 성 번호, 이어하기 불가, EX 확률, EX 맵(엑스트라 RE 번호), EX 스테이지 처음, 끝
+    (팩맨 콜라보: 1·2·3·4·5·7·10%, EX 맵 81 = 보너스 스테이지, 파워 쿠키 10개 확정).
+    나무위키는 팩맨 EX를 "각 10% 확률로 등장"이라고 적어서, 사이트에서 확률을 바꿀 수 있게 한다.
+    """
+    cat = next((c for c in CATEGORIES if c[0] == code), None)
+    if not cat:
+        return None
+    path = os.path.join(D, f"stage{cat[3]}{mid - cat[2] * 1000:03d}_{si:02d}.csv")
+    if not os.path.exists(path):
+        return None
+    head = ints(read(path)[0])
+    if len(head) < 6 or head[2] <= 0 or head[3] <= 0:
+        return None
+    msd = os.path.join(D, f"MapStageDataRE_{head[3]:03d}.csv")
+    if not os.path.exists(msd):
+        return None
+    rows = [ints(l) for l in data_lines(msd)[2:]]
+    ex = [parse_reward(rows[i]) for i in range(head[4], head[5] + 1) if i < len(rows) and len(rows[i]) >= 6]
+    return (head[2], ex) if ex else None
 
 
 def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
@@ -111,9 +135,20 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
             for item, n, p in repeat_drops(st):
                 if str(item) in gacha:
                     got[str(item)] += n * p / 100
-            if got:
+            # EX 스테이지 (통솔력 0): EX 한 번에 얻는 티켓·XP 기대값 (EX 스테이지가 여럿이면 평균)
+            ex, exr = None, ex_info(D, code, mid, st["i"])
+            if exr:
+                prob, exs = exr
+                et = collections.Counter()
+                for e in exs:
+                    for item, n, p in repeat_drops(e) or [[d[0], d[1], 100] for d in e.get("drop", []) if e.get("dropAll")]:
+                        if str(item) in gacha:
+                            et[str(item)] += n * p / 100 / len(exs)
+                if et:
+                    ex = {"p": prob, "t": {k: round(v, 3) for k, v in et.items()}, "xp": round(sum(stage_xp(e) for e in exs) / len(exs))}
+            if got or ex:
                 stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
-                               "t": {k: round(v, 3) for k, v in got.items()}})
+                               "t": {k: round(v, 3) for k, v in got.items()}, **({"ex": ex} if ex else {})})
     return gacha, stages
 
 
