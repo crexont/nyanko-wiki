@@ -276,9 +276,7 @@ function ticketRows(d, sc, now, rareNp) {
 // ---- 이벤트 뽑기·럭키 뽑기 (전용 티켓) ----
 // np.json gacha: 티켓 → 세트("normal:62"·"collab:54") → entries [등급 칸, 칸 수, 캐릭(-1), 아이템(-1), 중복 NP]
 const GRADE = { normal: ["노멀", "대박", "초 대박", "슈퍼 대박", "레전드"], collab: ["노멀", "대박", "초 대박", "한정 캐릭터", "레전드"] };
-// 고양이 농가·고양이 도마뱀: 이벤트 뽑기에서 노멀 칸(1번째)에 들어가고 10회 확정에서 빠진다
-// (아카라이브 "전설의 벌레 채집망 상세" 2023 확률표: 노멀 5% = 농가·도마뱀 각 2.5%, 확정은 나머지 3종)
-const NO_GUARANTEE = new Set([381, 7]);
+const NO_GUARANTEE = new Set([381]);  // 고양이 농가: 10회 확정에서 빠지고 랜덤으로만 나옴
 // 지금 일정에 없는 이벤트 뽑기의 한정 캐릭터 칸 확률(%)과 확정 주기(N회마다 한정 캐릭 1개, 0 = 없음).
 // 출처: 나무위키 "냥코 대전쟁/캐릭터/EX/이벤트 뽑기" (2026-11-05 확인). 열려 있으면 서버 확률을 쓴다
 const EVENT_RATES = {
@@ -287,8 +285,7 @@ const EVENT_RATES = {
   235: [10, 10],  // 전설의 복주머니 (설날)
   242: [15, 10],  // 전설의 러브레터 (두근두근 냥코 학교)
   255: [10, 10],  // 전설의 성수 (악마의 준 브라이드)
-  260: [10, 10],  // 전설의 벌레 채집망 (여름 방학 리바이벌)
-  196: [10, 10, 5],  // 전설의 벌레 채집망 (2023 여름 방학, 비밀기지): 한정 10% + 노멀 칸 캐릭 5% (아카라이브 확률표)
+  260: [10, 10], 196: [10, 10],  // 전설의 벌레 채집망 (여름 방학)
   216: [10, 10], 204: [10, 10],  // 전설의 트랩 (여름 방학 서바이벌)
   259: [8, 50],   // 전설의 돈다발 (여름 방학 파라다이스, 50회마다)
   267: [5, 10],   // 파워 쿠키 (팩맨): 커뮤니티 영상 수치(통솔력 400당 2.71NP, 1스테·EX 10%)를 거꾸로 계산한 값
@@ -317,13 +314,11 @@ function ticketGacha(d, sc, now, rareNp) {
     const keys = Object.keys(g.sets);
     const hit = keys.filter(k => known.has(k)).sort((a, b) => known.get(b).open - known.get(a).open)[0];
     const key = hit || keys.sort((a, b) => b.split(":")[1] - a.split(":")[1])[0];  // 없으면 가장 최근 세트
-    const kind = key.split(":")[0];
-    // 노멀 칸에 들어가는 캐릭(농가·도마뱀)은 1번째 칸으로 옮긴다
-    const set = kind === "collab" ? { ...g.sets[key], entries: g.sets[key].entries.map(e => e[2] >= 0 && NO_GUARANTEE.has(e[2]) ? [0, ...e.slice(1)] : e) } : g.sets[key];
+    const set = g.sets[key], kind = key.split(":")[0];
     const k = known.get(key);
     const wiki = !k && kind === "collab" ? EVENT_RATES[tid] : null;
     const slot = wiki ? wiki[0] : opt.eventChar;
-    const rates = k?.rates || (kind === "collab" ? [[(wiki?.[2] || 0) * 100, 0], [0, 0], [0, 0], [slot * 100, 0], [0, 0]] : null);
+    const rates = k?.rates || (kind === "collab" ? [[0, 0], [0, 0], [0, 0], [slot * 100, 0], [0, 0]] : null);
     const every = kind === "collab" ? (EVENT_RATES[tid]?.[1] ?? 10) : 0;
     // 이벤트 뽑기는 10번마다 한정 캐릭 하나가 확정 (나무위키 이벤트 뽑기 문서, 고양이 농가는 확정에서 빠짐)
     const pool = kind === "collab" ? set.entries.filter(e => e[2] >= 0 && !NO_GUARANTEE.has(e[2])) : [];
@@ -348,7 +343,7 @@ function eventRows(d, sc, now, tg) {
     const exP = s.ex ? exProb(s.ex) : 0, xp = s.xp + (s.ex ? exP * s.ex.xp : 0);
     const got = [s.t[tid] && `${+s.t[tid].toFixed(2)}장`, s.ex?.t[tid] && exP && `EX ${+(exP * 100).toFixed(1)}% × ${s.ex.t[tid]}장`].filter(Boolean).join(" + ");
     rows.push({ group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
-      sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}${s.map >= 25000 ? " · 지도 1장에 1번 (지도는 이벤트 스테이지에서 나옴)" : ""}`,
+      sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
       np: n * (t.np || 0) + xpNp(xp), energy: s.energy });
   }
   // 티켓을 걸고 하는 스테이지 (한탕 오락실): 통솔력 0, 건 티켓보다 평균 몇 장 더 받는지(손익)를 NP로
@@ -380,7 +375,7 @@ function ticketPanel(d, tg) {
       const st = stagesOf(tid);
       const spec = t.set.special.map(([, n, name]) => `${name} ${n}개`).join(", ");
       return `<tr${t.open ? ` class="boss"` : ""}>
-        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (${({ 267: "커뮤니티 역산", 196: "아카라이브 확률표" })[tid] || "나무위키"})${t.rates[0][0] && t.chars.some(e => e[0] === 0) ? ` + 노멀 칸 캐릭 ${t.rates[0][0] / 100}%` : ""}` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
+        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (${TICKET_NOTE[tid]?.[0] === "comm" ? "커뮤니티 역산" : "나무위키"})` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b>${t.manual ? `<br><small>자동 ${t.auto == null ? "-" : n2(t.auto)}</small>` : ""}</td>
         <td data-l="직접 입력"><input class="np-tin" type="number" min="0" step="0.01" data-tnp="${tid}" value="${t.manual ? opt.tNp[tid] : ""}" placeholder="자동"></td>
         <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${betText(d, tid)}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
@@ -413,7 +408,6 @@ const TICKET_NOTE = {
   215: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
   178: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
   198: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
-  196: ["ok", "아카라이브 \"전설의 벌레 채집망 상세\" 확률표 (노멀 5%: 농가·도마뱀, 한정 10%: 3종, 10회 확정은 3종 중)"],
   259: ["clash", "나무위키: 50회마다 확정 / 일본 위키(seesaawiki): 확정 틀 없음 → 나무위키 값"],
 };
 function basisHtml(d, tg, rareRaw) {
