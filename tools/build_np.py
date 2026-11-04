@@ -56,8 +56,8 @@ def stage_xp(st: dict) -> int:
     return round((st.get("xp") or 0) + sum(n * p / 100 for i, n, p in repeat_drops(st) if i == XP_DROP))
 
 
-def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, list] | None:
-    """스테이지를 깬 뒤 나올 수 있는 EX 스테이지: (출현 확률 %, [EX 스테이지 보상 dict…]).
+def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, int, list] | None:
+    """스테이지를 깬 뒤 나올 수 있는 EX 스테이지: (출현 확률 %, EX 맵 번호, [(EX 스테이지 번호, 보상 dict)…]).
 
     stage<코드><맵>_<스테이지>.csv 첫 줄 = 성 번호, 이어하기 불가, EX 확률, EX 맵(엑스트라 RE 번호), EX 스테이지 처음, 끝
     (팩맨 콜라보: 1·2·3·4·5·7·10%, EX 맵 81 = 보너스 스테이지, 파워 쿠키 10개 확정).
@@ -76,8 +76,30 @@ def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, list] | None:
     if not os.path.exists(msd):
         return None
     rows = [ints(l) for l in data_lines(msd)[2:]]
-    ex = [parse_reward(rows[i]) for i in range(head[4], head[5] + 1) if i < len(rows) and len(rows[i]) >= 6]
-    return (head[2], ex) if ex else None
+    ex = [(i, parse_reward(rows[i])) for i in range(head[4], head[5] + 1) if i < len(rows) and len(rows[i]) >= 6]
+    return (head[2], head[3], ex) if ex else None
+
+
+def ex_value(D: str, code: str, mid: int, si: int, items, depth: int = 0) -> tuple[int, dict, float] | None:
+    """EX 한 번에 얻는 아이템·XP 기대값. EX 스테이지에서 또 EX가 나오면(악천후 예보: 호우 → 뇌우 → 대형 폭풍우, 각 100%)
+    그 기대값도 데이터 확률대로 더한다. 반환: (첫 EX 출현 확률 %, {아이템: 개수}, XP)."""
+    info = ex_info(D, code, mid, si)
+    if not info or depth > 5:
+        return None
+    prob, exmap, exs = info
+    got, xp = collections.Counter(), 0.0
+    for j, e in exs:
+        for item, n, p in repeat_drops(e) or [[d[0], d[1], 100] for d in e.get("drop", []) if e.get("dropAll")]:
+            if str(item) in items:
+                got[str(item)] += n * p / 100 / len(exs)
+        xp += stage_xp(e) / len(exs)
+        nested = ex_value(D, "RE", 4000 + exmap, j, items, depth + 1)
+        if nested:
+            np_, nt, nxp = nested
+            for k, v in nt.items():
+                got[k] += np_ / 100 * v / len(exs)
+            xp += np_ / 100 * nxp / len(exs)
+    return prob, got, xp
 
 
 def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
@@ -137,16 +159,9 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
                 if str(item) in gacha:
                     got[str(item)] += n * p / 100
             # EX 스테이지 (통솔력 0): EX 한 번에 얻는 티켓·XP 기대값 (EX 스테이지가 여럿이면 평균)
-            ex, exr = None, ex_info(D, code, mid, st["i"])
-            if exr:
-                prob, exs = exr
-                et = collections.Counter()
-                for e in exs:
-                    for item, n, p in repeat_drops(e) or [[d[0], d[1], 100] for d in e.get("drop", []) if e.get("dropAll")]:
-                        if str(item) in gacha:
-                            et[str(item)] += n * p / 100 / len(exs)
-                if et:
-                    ex = {"p": prob, "t": {k: round(v, 3) for k, v in et.items()}, "xp": round(sum(stage_xp(e) for e in exs) / len(exs))}
+            ex, exr = None, ex_value(D, code, mid, st["i"], gacha)
+            if exr and exr[1]:
+                ex = {"p": exr[0], "t": {k: round(v, 3) for k, v in exr[1].items()}, "xp": round(exr[2])}
             e = st.get("energy") or 0
             if e >= ITEM_COST:
                 # 티켓을 걸고 들어가는 스테이지 (한탕 오락실): 통솔력이 안 들어서 순위 대신 "n개 걸면 평균 m개"로 보여 준다
