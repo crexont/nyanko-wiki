@@ -141,9 +141,10 @@ function paintBody(root, rows, d, tg, draw) {
   const cpe = opt.leaderCans / opt.maxEnergy;  // 통솔력 1 = 통조림
   const calc = r => {
     const cans = (r.energy || 0) * cpe + (r.cans || 0), energy = (r.energy || 0) + (r.cans || 0) / cpe;
+    if (r.bet) return { ...r, c100: Infinity, e100: Infinity };
     return { ...r, c100: r.np / cans * opt.perCans, e100: r.np / energy * opt.perEnergy };
   };
-  const sorted = rows.filter(r => r.np > 0 && (opt.group === "all" || r.group === opt.group)).map(calc).sort((a, b) => b.c100 - a.c100);
+  const sorted = rows.filter(r => r.np > 0 && (opt.group === "all" || r.group === opt.group)).map(calc).sort((a, b) => (b.c100 - a.c100) || (b.np - a.np));
   // 같은 맵(fold 키)의 스테이지는 가장 좋은 것 하나만 보이고 나머지는 접어 둔다
   const heads = new Map();
   for (const r of sorted) {
@@ -153,11 +154,12 @@ function paintBody(root, rows, d, tg, draw) {
   const list = [...heads.values()];
   const E = `통솔력 ${opt.perEnergy}당`, C = `통조림 ${opt.perCans}당`;
   const unit = k => `<input class="np-unit" type="number" min="1" step="1" data-u="${k}" value="${opt[k]}" title="눌러서 비교 기준을 바꿔요">`;
-  const cost = r => [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
+  const cost = r => r.bet || [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
+  const val = (r, x) => r.bet ? `<small>1회</small> ${n2(r.np)}` : n2(x);
   const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
         <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
         <td data-l="비용">${cost(r)}</td>
-        <td data-l="${E}">${n2(r.e100)}</td><td data-l="${C}"><b>${n2(r.c100)}</b></td></tr>`;
+        <td data-l="${E}">${val(r, r.e100)}</td><td data-l="${C}"><b>${val(r, r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
     <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · NP / ${C} 순</span></h2>
       <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / 통솔력 ${unit("perEnergy")}당</th><th>NP / 통조림 ${unit("perCans")}당</th></tr></thead><tbody>
@@ -348,6 +350,14 @@ function eventRows(d, sc, now, tg) {
     rows.push({ group: "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
       np: n * (t.np || 0) + xpNp(xp), energy: s.energy });
+  }
+  // 티켓을 걸고 하는 스테이지 (한탕 오락실): 통솔력 0, 건 티켓보다 평균 몇 장 더 받는지(손익)를 NP로
+  for (const b of d.bets || []) {
+    const t = tg[b.item], got = b.t[b.item] || 0, net = got - b.cost;
+    if (!t?.np) continue;
+    rows.push({ group: "event", name: `${t.name} — ${b.name}`, href: `#/stage/${b.map}/${b.i}`, open: openMaps.has(b.map), fold: `${b.name}|${b.item}`,
+      sub: `${b.stage} — ${t.name} ${b.cost}장 걸면 평균 ${+got.toFixed(1)}장 (${net >= 0 ? "+" : ""}${+net.toFixed(1)}장) × ${n2(t.np)}NP · 통솔력 없이 티켓만 걸어요`,
+      np: net * t.np, energy: 0, bet: `${t.name} ${b.cost}장`, betCost: b.cost });
   }
   return rows;
 }
