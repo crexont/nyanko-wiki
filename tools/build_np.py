@@ -25,6 +25,7 @@ XP_DROP = 6          # 스테이지 보상 6 = XP (개수 = XP 양)
 XP_MAPS = 20         # 경험치 스테이지는 효율 좋은 맵 이만큼만
 CAT_TICKET, RARE_TICKET = 20, 21
 DRINK_A = 55
+ITEM_COST = 100000   # 통솔력 칸이 이 이상이면 아이템 입장 (아이템 번호 × 1000 + 개수)
 LIMITED = 3          # 이벤트 뽑기에서 캐릭이 나오는 등급 칸 (울슈레 자리 = 한정 캐릭터)
 # 강습 EX 스테이지 (기원·정점·비경 × 6속성). 같은 이름의 지도 스테이지(25009~)와 드롭이 달라서 번호로 고른다.
 EX_MAPS = range(25033, 25051)
@@ -79,7 +80,7 @@ def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, list] | None:
     return (head[2], ex) if ex else None
 
 
-def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
+def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
     """전용 티켓으로 돌리는 뽑기(럭키 뽑기·이벤트 뽑기)의 구성과, 그 티켓을 반복해서 얻는 스테이지.
 
     뽑기 세트 = GatyaData_Option_Set{N,E}.tsv 줄 (ItemID_Ticket = 스테이지 드롭 아이템 번호와 같음).
@@ -126,7 +127,7 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
                 if kind == "collab" else [],
             }
 
-    stages = []
+    stages, bets = [], []
     for mid, (code, m) in sorted(maps.items()):
         if code == "B" or mid in SKIP_MAPS:
             continue
@@ -146,10 +147,16 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list]:
                             et[str(item)] += n * p / 100 / len(exs)
                 if et:
                     ex = {"p": prob, "t": {k: round(v, 3) for k, v in et.items()}, "xp": round(sum(stage_xp(e) for e in exs) / len(exs))}
-            if got or ex:
+            e = st.get("energy") or 0
+            if e >= ITEM_COST:
+                # 티켓을 걸고 들어가는 스테이지 (한탕 오락실): 통솔력이 안 들어서 순위 대신 "n개 걸면 평균 m개"로 보여 준다
+                if got:
+                    bets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "item": e // 1000, "cost": e % 1000,
+                                 "t": {k: round(v, 3) for k, v in got.items()}})
+            elif got or ex:
                 stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                "t": {k: round(v, 3) for k, v in got.items()}, **({"ex": ex} if ex else {})})
-    return gacha, stages
+    return gacha, stages, bets
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -244,7 +251,7 @@ def main(argv: list[str] | None = None) -> None:
                 tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                 "cat": round(cat, 3), "rare": round(rare, 3)})
 
-    gacha, gacha_stages = ticket_gacha(D, maps)
+    gacha, gacha_stages, bets = ticket_gacha(D, maps)
 
     # 경험치 스테이지: 통솔력당 XP가 좋은 맵 (고양이 드링크 스테이지 B는 통솔력이 아니라서 뺀다)
     by_map = collections.defaultdict(list)
@@ -279,7 +286,7 @@ def main(argv: list[str] | None = None) -> None:
 
     data = {"dupe": dupe, "gradeNp": grade_np, "exNp": ex_np, "drinkA": drink,
             "behemoth": beh_out, "orbMaps": orb_maps, "tickets": tickets,
-            "gacha": gacha, "gachaStages": gacha_stages, "xpStages": xp_stages, "xpItems": xp_items}
+            "gacha": gacha, "gachaStages": gacha_stages, "bets": bets, "xpStages": xp_stages, "xpItems": xp_items}
     out = os.path.join(SITE, "data", "np.json")
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))

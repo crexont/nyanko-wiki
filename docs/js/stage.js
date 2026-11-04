@@ -35,6 +35,9 @@ function dbStageUrl(mid, si) {
   return `https://battlecats-db.com/stage/s${map}-${String(si + 1).padStart(2, "0")}.html`;
 }
 const itemName = (idx, id) => idx.items[id] ?? GD.items?.[id] ?? `아이템 ${id}`;
+// 입장 비용: 통솔력, 또는 아이템으로 들어가는 스테이지 (통솔력 칸 = 아이템 번호 × 1000 + 개수, 한탕 오락실 259100 = 전설의 돈다발 100개)
+const ITEM_COST = 100000;
+const costText = (idx, e) => e == null ? "통솔력 -" : e >= ITEM_COST ? `${itemName(idx, Math.floor(e / 1000))} ${e % 1000}개` : `통솔력 ${e}`;
 
 // 드롭 보상 한 칸: 아이템(번호 < 1000) 또는 캐릭(1000 이상: 번호 − 1000 / 10000 이상: 번호 − 10000)
 function rewardHtml(idx, [id, amount, chance], all) {
@@ -119,7 +122,7 @@ export function renderMap(root, mid) {
         return `<a class="stage-row" href="#/stage/${mid}/${s.i}">
           <span class="no">${s.i + 1}</span>
           <span class="body"><b>${esc(s.n)}</b>
-            <small>통솔력 ${s.energy ?? "-"} · 성 체력 ${s.time ? "무한" : num(s.hp)}${boss.length ? ` · 보스 ${boss.map(e => esc(e?.name ?? "?")).join(", ")}` : ""}</small></span>
+            <small>${esc(costText(idx, s.energy))} · 성 체력 ${s.time ? "무한" : num(s.hp)}${boss.length ? ` · 보스 ${boss.map(e => esc(e?.name ?? "?")).join(", ")}` : ""}</small></span>
           <span class="ens">${show.map(e => enemyIcon(e, "sm")).join("")}</span></a>`;
       }).join("")}</div>`;
     document.title = `${m.n} - 냥코위키`;
@@ -191,7 +194,7 @@ function paint(root, idx, mid, m, s, byId) {
       </div>
       <div>
         <div class="panel"><h2>스테이지 정보</h2><dl class="kv">
-          <dt>통솔력</dt><dd>${s.energy ?? "-"}</dd>
+          <dt>${s.energy >= ITEM_COST ? "입장" : "통솔력"}</dt><dd>${s.energy >= ITEM_COST ? esc(costText(idx, s.energy).replace(/^통솔력 /, "")) : s.energy ?? "-"}</dd>
           ${s.xp ? `<dt>경험치</dt><dd>${num(s.xp)}</dd>` : ""}
           <dt>성 체력</dt><dd>${s.time ? "무한 (시간 제한)" : num(s.hp)}</dd>
           <dt>스테이지 길이</dt><dd>${num(s.w)}</dd>

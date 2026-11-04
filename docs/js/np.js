@@ -334,6 +334,12 @@ function eventRows(d, sc, now, tg) {
   }
   return rows;
 }
+// 티켓을 걸고 들어가는 스테이지 (한탕 오락실 등): 통솔력이 안 들어서 순위표 대신 여기 적는다
+function betText(d, tid) {
+  const bs = (d.bets || []).filter(b => b.item == tid && b.t[tid]);
+  return bs.length ? `<br>티켓을 걸고 하는 스테이지: ${bs.map(b =>
+    `<a href="#/stage/${b.map}/${b.i}">${esc(b.stage)}</a> ${b.cost}장 → 평균 ${+b.t[tid].toFixed(1)}장`).join(", ")}` : "";
+}
 function ticketPanel(d, tg) {
   const list = Object.entries(tg).sort((a, b) => (b[1].np ?? -1) - (a[1].np ?? -1) || a[0] - b[0]);
   if (!list.length) return "";
@@ -350,7 +356,7 @@ function ticketPanel(d, tg) {
         <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : grades}${t.est || t.open ? "" : ` · ${t.start.slice(5, 10).replace("-", "/")} 시작`}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b>${t.manual ? `<br><small>자동 ${t.auto == null ? "-" : n2(t.auto)}</small>` : ""}</td>
         <td data-l="직접 입력"><input class="np-tin" type="number" min="0" step="0.01" data-tnp="${tid}" value="${t.manual ? opt.tNp[tid] : ""}" placeholder="자동"></td>
-        <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
+        <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${betText(d, tid)}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
         <td data-l="드롭 스테이지"><small>${st.length ? `${st.length}곳 · 최고 통솔력 ${opt.perEnergy}당 ${n2(stageTickets(st[0], tid) / st[0].energy * opt.perEnergy)}장 (<a href="#/stage/${st[0].map}/${st[0].i}">${esc(st[0].name)} ${esc(st[0].stage)}</a>)` : "-"}</small></td></tr>`;
     }).join("")}
     </tbody></table></div></div>`;
