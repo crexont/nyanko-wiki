@@ -8,7 +8,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";
-const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, rareBase: "auto", catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
+const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
   npRare: true, npBlue: true, npOrb: true, npXp: false, xpNp: 0.45, radarNp: 0, tNp: {}, exPct: null, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
@@ -22,6 +22,7 @@ const RARE_KINDS = [
   ["double", "울슈레·레전드 확률 2배", [64.4, 25, 10, 0.6]],
 ];
 const kindRates = r => [[0, 0], ...r.map(p => [p * 100, 0])];
+const RARE_BEST = RARE_KINDS.find(([k]) => k === "double");  // 레어 티켓 가치 기준
 // 냥코 뽑기(냥코 티켓): 기본 캐릭 아니면 파란구슬. 파란구슬 5개 = 레어 티켓 1장.
 // 뽑기 칸 구성(기본 캐릭 9 + 파란구슬 9, 우주편 3장 뒤 "냥코 뽑기+"는 고양이 초인이 더해져 10 + 9)과
 // 냥코 뽑기+ 기본 캐릭 2NP는 게임 데이터에 없어서 커뮤니티 정리 값을 쓴다.
@@ -39,7 +40,6 @@ const opt = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(K
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } catch {} };
 
 const RATE_RARITY = [0, 2, 3, 4, 5];  // 뽑기 확률 순서 [노멀, 레어, 슈레, 울슈레, 레전드] → 레어도 (np.json dupe 순서)
-const BASE_RATES = [[0, 0], [7000, 0], [2500, 0], [500, 0], [0, 0]];  // 일정 데이터가 없을 때 레어 티켓 기준
 const TIERS = ["기원", "정점", "비경"];
 const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", lucky: "럭키 티켓", event: "이벤트 티켓", xp: "경험치" };
 const LUCKY = new Set(["155", "156"]);  // 럭키 티켓 · 럭키 티켓G
@@ -61,10 +61,9 @@ export function renderNp(root) {
     const banners = gatyaBanners(sc, d.dupe, now);
     XP_ITEMS = d.xpItems || {};
     const draw = () => {
-      // 레어 티켓: 고른 뽑기 종류, "자동"이면 지금 열린 150통조림 레어 뽑기 중 가장 좋은 배너에 쓴다고 본다
-      const kind = RARE_KINDS.find(([k]) => k === opt.rareBase);
-      const rareRaw = kind ? pullNp(kindRates(kind[2]), d.dupe)
-        : Math.max(pullNp(BASE_RATES, d.dupe), ...banners.filter(b => b.open && b.price === 150).map(b => b.np));
+      // 레어 티켓은 가장 좋은 뽑기(울슈레·레전드 확률 2배)에 쓴다고 본다.
+      // 어디에 쓰든 다른 방법과 비교한 상대 가치는 같아서, 고르는 칸 없이 하나로 고정 (사용자 결정)
+      const rareRaw = pullNp(kindRates(RARE_BEST[2]), d.dupe);
       const rareNp = opt.npRare ? rareRaw : 0;  // 레어 티켓을 뽑지 않고 아껴 두면 NP 0
       const tg = ticketGacha(d, sc, now, rareNp);
       const rows = [...gatyaRows(banners, rareNp, d.dupe), ...behRows(d), ...mapRows(d), ...ticketRows(d, sc, now, rareNp),
@@ -90,8 +89,6 @@ function paintOpt(root, d, rareNp, draw) {
       ${num("maxEnergy", "최대 통솔력")}
       ${num("leaderCans", "리더쉽 1개 = 통조림")}
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
-      <label class="np-in"><span>레어 티켓 쓰는 뽑기</span><select data-k="rareBase"><option value="auto">자동 (지금 열린 배너 중 최고)</option>${RARE_KINDS.map(([k, name, r]) =>
-        `<option value="${k}"${k === opt.rareBase ? " selected" : ""}>${name}  (${r.join(" / ")})</option>`).join("")}</select></label>
       <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
       <label class="np-in" title="확률이 서버 데이터에 없는(지금 안 열린) 이벤트 뽑기에서 한정 캐릭터가 나올 확률"><span>지난 이벤트 뽑기 한정 캐릭 %</span><input type="number" min="0" max="100" step="0.1" data-k="eventChar" value="${opt.eventChar}"></label>
       <label class="np-in"><span>강습 레벨</span><select data-k="lv">${beh.map(s =>
@@ -114,7 +111,7 @@ function paintOpt(root, d, rareNp, draw) {
       <button class="chip" data-drink aria-pressed="${opt.drink}" title="강습은 30분에 한 번. 바로 다시 하려면 고양이 드링크 A(통조림 ${d.drinkA}개)">강습에 드링크 A 쓰기</button>
     </div>
     <p class="np-note">리더쉽 1개는 통솔력을 최대치만큼 채운다고 보고 환산해요 (통솔력 ${opt.maxEnergy} = 통조림 ${opt.leaderCans}).
-      레어 티켓 1장 = NP ${n2(rareNp)}${opt.npRare ? "" : " (지금은 NP로 안 침)"} (${RARE_KINDS.find(([k]) => k === opt.rareBase)?.[1] ?? "지금 열린 레어 뽑기 중 가장 좋은 배너"} 기준).
+      레어 티켓 1장 = NP ${n2(rareNp)}${opt.npRare ? "" : " (지금은 NP로 안 침)"} (${RARE_BEST[1]} 기준 — 레어 티켓을 가장 잘 쓰는 경우).
       냥코 티켓 1장 = NP ${n2(catTicketNp(opt.npRare ? rareNp : 0))}: 파란구슬 ${pct(CAT_GATYA[opt.catPlus].orb * 100)} (${ORBS_PER_RARE}개 = 레어 티켓 1장), 기본 캐릭 중복 ${CAT_GATYA[opt.catPlus].cat}NP.</p>`;
   box.querySelector("[data-ex]").onchange = e => {
     const v = e.target.value.trim();
@@ -124,7 +121,6 @@ function paintOpt(root, d, rareNp, draw) {
   box.querySelectorAll("[data-k]").forEach(el => el.onchange = () => {
     const k = el.dataset.k, v = +el.value;
     if (k === "catPlus") opt.catPlus = v === 1;
-    else if (k === "rareBase") opt.rareBase = el.value;
     else if (v > 0 || (["lv", "eventChar", "xpNp", "radarNp"].includes(k) && v >= 0)) opt[k] = v;
     save();
     draw();
@@ -416,7 +412,7 @@ function basisHtml(d, tg, rareRaw) {
     ["뽑기·중복", "중복 캐릭 NP", `기본 ${d.dupe[0]} · EX ${d.dupe[1]} · 레어 ${d.dupe[2]} · 슈레 ${d.dupe[3]} · 울슈레 ${d.dupe[4]} · 레전드 ${d.dupe[5]}`, "게임 데이터 (unitbuy 58열), 나무위키 본능 문서와 일치", "ok"],
     ["뽑기·중복", "지금 열린 뽑기 확률", "배너마다 서버 값", "서버 일정 데이터 (gatya.tsv)", "ok"],
     ["뽑기·중복", "레어 뽑기 종류별 기준 확률", RARE_KINDS.map(([, n, r]) => `${n} ${r.join("/")}`).join(" · "), "커뮤니티 정리 (축제는 열릴 때만 서버에 나옴)", "comm"],
-    ["뽑기·중복", "레어 티켓 1장", `NP ${n2(rareRaw)} (고른 뽑기 기준)`, "위 확률로 계산", "set"],
+    ["뽑기·중복", "레어 티켓 1장", `NP ${n2(rareRaw)} (${RARE_BEST[1]} ${RARE_BEST[2].join("/")} 기준)`, "가장 좋은 뽑기에 쓴다고 봄. 어디에 쓰든 상대 가치는 같아서 하나로 고정", "comm"],
     ["뽑기·중복", "냥코 뽑기 구성", "기본 캐릭 9 + 파란구슬 9 / 뽑기+(우주편 3장 뒤) 10 + 9, 중복 1NP / 2NP", "나무위키 뽑기·본능 문서", "ok"],
     ["뽑기·중복", "파란구슬 → 레어 티켓", "5개 = 1장, 그 능력이 +10까지 다 올라가야 교환", "나무위키 자원 문서", "ok"],
     ["럭키·이벤트", "럭키 티켓 1장", "꼬맹이 9종 각 3.7% → 0.33NP", "게임 데이터 구성 + 서버 확률, 나무위키 표와 일치", "ok"],
