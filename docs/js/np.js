@@ -10,7 +10,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 const KEY = "nyanko-wiki.np";
 const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
-  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
+  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, radarOn: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -176,6 +176,11 @@ function paintBody(root, rows, d, tg, draw) {
   });
   root.querySelectorAll("[data-lv]").forEach(el => el.onchange = () => { opt.lv = +el.value; save(); draw(); });
   root.querySelectorAll("[data-drk]").forEach(b => b.onclick = () => { opt.drink = !opt.drink; save(); draw(); });
+  root.querySelectorAll("[data-rd]").forEach(b => b.onclick = () => {
+    const k = b.dataset.rd;
+    if (opt.radarOn[k]) delete opt.radarOn[k]; else opt.radarOn[k] = true;
+    save(); draw();
+  });
   root.querySelectorAll("[data-ad]").forEach(b => b.onclick = () => {
     const m = b.dataset.ad;
     if (opt.xpAdOff[m]) delete opt.xpAdOff[m]; else opt.xpAdOff[m] = true;
@@ -273,11 +278,16 @@ function mapRows(d) {
 const ONCE_PER_OPEN = { 1078: "열릴 때마다 1번만 (6.7.0부터, 한 달 약 10번)", 1173: "비정기, 열릴 때마다 1번만" };
 function ticketRows(d, sc, now, rareNp) {
   const openMaps = new Set((sc?.sale || []).filter(e => openNow(e, now)).flatMap(e => e.maps));
-  return d.tickets.map(t => ({
+  return d.tickets.map(t => {
+    const cNp = catTicketNp(rareNp), base = t.cat * cNp + t.rare * rareNp;
+    const can = t.catTop > t.cat + 1e-6 || t.rareTop > t.rare + 1e-6, key = `t${t.map}-${t.i}`, on = can && opt.radarOn[key];
+    const gain = (t.catTop - t.cat) * cNp + (t.rareTop - t.rare) * rareNp - RADAR_NP;
+    return {
     group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map), fold: `m${t.map}`,
     sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도 1장에 1번)" : ""}${ONCE_PER_OPEN[t.map] ? ` · ${ONCE_PER_OPEN[t.map]}` : ""}`,
-    np: t.cat * catTicketNp(rareNp) + t.rare * rareNp + xpNp(t.xp), energy: t.energy,
-  }));
+    np: base + (on ? gain : 0) + xpNp(t.xp), energy: t.energy,
+    extra: can ? radarBtn(key, gain) : "",
+  }; });
 }
 
 // ---- 이벤트 뽑기·럭키 뽑기 (전용 티켓) ----
@@ -300,6 +310,8 @@ const EVENT_RATES = {
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 // 트레저 레이더 1개 = 1.6NP: 역습의 대갈이군(2장 70% / 3장 30%)에 쓰면 3장 확정 → 냥코 티켓 0.7장 이득 (커뮤니티 값, 사용자 결정)
 const RADAR_NP = 1.6;
+// 스테이지에 트레저 레이더를 쓰면 드롭이 가장 많은 칸으로 확정. 레이더 1개(1.6NP)를 쓴 만큼 빼서 손익을 보여 준다
+const radarBtn = (key, gain) => `<button class="np-more" data-rd="${key}" aria-pressed="${!!opt.radarOn[key]}" title="트레저 레이더를 쓰면 드롭 확정. 레이더 1개 = ${RADAR_NP}NP를 뺀 손익">트레저 레이더 ${opt.radarOn[key] ? "씀" : "안 씀"} (${gain >= 0 ? "+" : ""}${n2(gain)}NP)</button>`;
 const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp
   : e[3] === RADAR ? (opt.npRadar ? RADAR_NP : 0) : xpNp(XP_ITEMS[e[3]]);
 function setNp(set, rates, rareNp) {
@@ -353,8 +365,14 @@ function eventRows(d, sc, now, tg) {
     const got = [s.t[tid] && `${+s.t[tid].toFixed(2)}장`, s.ex?.t[tid] && exP && `EX ${+(exP * 100).toFixed(1)}% × ${s.ex.t[tid]}장`].filter(Boolean).join(" + ");
     rows.push({ group: LUCKY.has(tid) ? "lucky" : "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
-      np: n * (t.np || 0) + xpNp(xp), energy: s.energy,
+      ...(() => {
+        const top = s.top?.[tid], key = `e${s.map}-${s.i}-${tid}`;
+        const gain = top ? (top - (s.t[tid] || 0)) * (t.np || 0) - RADAR_NP : 0, on = top && opt.radarOn[key];
+        return { np: n * (t.np || 0) + (on ? gain : 0) + xpNp(xp), rd: top ? radarBtn(key, gain) : "" };
+      })(),
+      energy: s.energy,
       extra: s.ex ? `<label class="np-exin" title="스테이지를 깬 뒤 EX 스테이지가 나올 확률. 게임 데이터 값은 ${s.ex.p}%">EX 출현 <input type="number" min="0" max="100" step="1" data-exm="${s.map}" value="${exPctOf(s)}">%</label>` : "" });
+    rows.at(-1).extra = [rows.at(-1).rd, rows.at(-1).extra].filter(Boolean).join(" ");
   }
   // 티켓을 걸고 하는 스테이지 (한탕 오락실): 통솔력 0, 건 티켓보다 평균 몇 장 더 받는지(손익)를 NP로
   for (const b of d.bets || []) {

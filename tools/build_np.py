@@ -156,10 +156,11 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
         if code == "B" or mid in SKIP_MAPS:
             continue
         for st in m["stages"]:
-            got = collections.Counter()
+            got, top = collections.Counter(), {}
             for item, n, p in repeat_drops(st):
                 if str(item) in gacha:
                     got[str(item)] += n * p / 100
+                    top[str(item)] = max(top.get(str(item), 0), n)  # 트레저 레이더를 쓰면 이만큼 확정
             # EX 스테이지 (통솔력 0): EX 한 번에 얻는 티켓·XP 기대값 (EX 스테이지가 여럿이면 평균)
             ex, exr = None, ex_value(D, code, mid, st["i"], gacha)
             if exr and exr[1]:
@@ -172,7 +173,8 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
                                  "t": {k: round(v, 3) for k, v in got.items()}})
             elif got or ex:
                 stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
-                               "t": {k: round(v, 3) for k, v in got.items()}, **({"ex": ex} if ex else {})})
+                               "t": {k: round(v, 3) for k, v in got.items()}, **({"ex": ex} if ex else {}),
+                               **({"top": top} if any(top[k] > got[k] + 1e-6 for k in top) else {})})
     return gacha, stages, bets
 
 
@@ -267,7 +269,10 @@ def main(argv: list[str] | None = None) -> None:
             rare = sum(n * p / 100 for item, n, p in d if item == RARE_TICKET)
             if cat or rare:
                 tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
-                                "cat": round(cat, 3), "rare": round(rare, 3)})
+                                "cat": round(cat, 3), "rare": round(rare, 3),
+                                # 트레저 레이더를 쓰면 확정되는 개수 (드롭이 확률일 때만 의미 있음)
+                                "catTop": max([n for item, n, p in d if item == CAT_TICKET] or [0]),
+                                "rareTop": max([n for item, n, p in d if item == RARE_TICKET] or [0])})
 
     gacha, gacha_stages, bets = ticket_gacha(D, maps)
 
