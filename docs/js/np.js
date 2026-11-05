@@ -424,7 +424,8 @@ function ticketPanel(d, tg) {
 // ---- XP 스테이지 (XP를 NP로 칠 때만). 광고 2배는 클리어 XP만 (s.ad = 클리어 XP) ----
 function xpRows(d) {
   if (!opt.npXp) return [];
-  return (d.xpStages || []).map(s => {
+  return (d.xpStages || []).map(s0 => {
+    const s = { clear: s0.xp, drop: 0, ...s0 };  // 옛 np.json(브라우저 캐시)엔 clear·drop이 없음
     // 클리어 XP는 광고로 딱 2배, 드롭 XP는 따로 (광고와 상관없음, 트레저 레이더를 쓰면 가장 큰 칸 확정)
     // 고양이 박사(아이템 4번, 비용 0으로 침): 클리어 XP 1.5배, 드롭 XP엔 안 붙음. 기본 켜짐
     const on = s.ad && !opt.xpAdOff[s.map], doc = !opt.xpDocOff[s.map];
@@ -434,7 +435,7 @@ function xpRows(d) {
     const f = n => n.toLocaleString();
     return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
       sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)} (${[`기본 ${f(s.clear)}`, `보너스 ${opt.xpMult}배`, on && "광고 2배", doc && "고양이 박사 1.5배"].filter(Boolean).join(" × ")}) + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
-        + (s.once ? ` · 1회 한정 드롭 ${f(s.once)}은 뺌` : ""),
+        + (s.once ? ` · ${f(s.once)} 칸은 맵이 열릴 때마다 1번` : ""),
       np: xpNp(clear + drop) - (rd ? RADAR_NP : 0), energy: s.energy,
       extra: [s.top ? radarBtn(key, gain) : "", s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "ON" : "OFF"}</button>` : "",
         `<button class="np-more" data-doc="${s.map}" aria-pressed="${doc}" title="고양이 박사: 클리어 XP 1.5배 (드롭 XP는 그대로). 남아도는 아이템이라 비용 0">고양이 박사 ${doc ? "ON" : "OFF"}</button>`].filter(Boolean).join(" ") };
