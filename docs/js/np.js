@@ -10,7 +10,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 const KEY = "nyanko-wiki.np";
 const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
-  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, radarOn: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
+  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, xpDocOff: {}, radarOn: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -179,6 +179,11 @@ function paintBody(root, rows, d, tg, draw) {
   root.querySelectorAll("[data-rd]").forEach(b => b.onclick = () => {
     const k = b.dataset.rd;
     if (opt.radarOn[k]) delete opt.radarOn[k]; else opt.radarOn[k] = true;
+    save(); draw();
+  });
+  root.querySelectorAll("[data-doc]").forEach(b => b.onclick = () => {
+    const m = b.dataset.doc;
+    if (opt.xpDocOff[m]) delete opt.xpDocOff[m]; else opt.xpDocOff[m] = true;
     save(); draw();
   });
   root.querySelectorAll("[data-ad]").forEach(b => b.onclick = () => {
@@ -419,15 +424,18 @@ function xpRows(d) {
   if (!opt.npXp) return [];
   return (d.xpStages || []).map(s => {
     // 클리어 XP는 광고로 딱 2배, 드롭 XP는 따로 (광고와 상관없음, 트레저 레이더를 쓰면 가장 큰 칸 확정)
-    const on = s.ad && !opt.xpAdOff[s.map], clear = s.clear * (on ? 2 : 1);
+    // 고양이 박사(아이템 4번, 비용 0으로 침): 클리어 XP 1.5배, 드롭 XP엔 안 붙음. 기본 켜짐
+    const on = s.ad && !opt.xpAdOff[s.map], doc = !opt.xpDocOff[s.map];
+    const clear = Math.round(s.clear * (on ? 2 : 1) * (doc ? 1.5 : 1));
     const key = `x${s.map}-${s.i}`, rd = s.top && opt.radarOn[key], drop = rd ? s.top : s.drop;
     const gain = s.top ? xpNp(s.top - s.drop) - RADAR_NP : 0;
     const f = n => n.toLocaleString();
     return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
-      sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)}${on ? " (광고 2배)" : ""} + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
+      sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)}${on || doc ? ` (${[on && "광고 2배", doc && "고양이 박사 1.5배"].filter(Boolean).join(" × ")})` : ""} + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
         + (s.once ? ` · 1회 한정 드롭 ${f(s.once)}은 뺌` : ""),
       np: xpNp(clear + drop) - (rd ? RADAR_NP : 0), energy: s.energy,
-      extra: [s.top ? radarBtn(key, gain) : "", s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "켜짐" : "꺼짐"}</button>` : ""].filter(Boolean).join(" ") };
+      extra: [s.top ? radarBtn(key, gain) : "", s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "ON" : "OFF"}</button>` : "",
+        `<button class="np-more" data-doc="${s.map}" aria-pressed="${doc}" title="고양이 박사: 클리어 XP 1.5배 (드롭 XP는 그대로). 남아도는 아이템이라 비용 0">고양이 박사 ${doc ? "ON" : "OFF"}</button>`].filter(Boolean).join(" ") };
   });
 }
 
