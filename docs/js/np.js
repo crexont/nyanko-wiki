@@ -429,7 +429,7 @@ function basisHtml(d, tg, rareRaw) {
     ["본능옥·강습", "강습 EX 출현 확률", "Lv.1 1% … Lv.MAX 기원 59.4 · 정점 30.6 · 비경 10%", "게임 데이터 (EX_group), 나무위키 강습 문서와 일치", "ok"],
     ["환산", "리더쉽 1개", `통조림 ${opt.leaderCans} (통솔력 ${opt.maxEnergy} 채움)`, "설정", "set"],
     ["환산", "경험치 → NP (사당)", `100만 = ${opt.xpNp}NP${opt.npXp ? "" : " (지금은 안 침)"}`, "커뮤니티 (500만당 약 2.25NP)", "comm"],
-    ["환산", "트레저 레이더 1개", `${RADAR_NP}NP${opt.npRadar ? "" : " (지금은 안 침)"}`, "역습의 대갈이군에 쓰면 냥코 티켓 0.7장 이득 (0.7 × 2.27NP), 커뮤니티 값", "comm"],
+    ["환산", "트레저 레이더 1개", `${RADAR_NP}NP (역습의 대갈이군에 쓰는 기준)${opt.npRadar ? "" : " — 지금은 안 침"}`, "역습의 대갈이군에 쓰면 냥코 티켓 0.7장 이득 (0.7 × 2.27NP), 커뮤니티 값", "comm"],
   ];
   // 이벤트 뽑기 티켓별 (캐릭이 있는 것만)
   for (const [tid, t] of Object.entries(tg)) {
@@ -452,7 +452,7 @@ function basisHtml(d, tg, rareRaw) {
       <td data-l="쓰는 값"><small>${esc(val)}</small></td><td data-l="출처"><small>${esc(src)}</small></td></tr>`).join("")}
     </tbody></table></div></div>
     <div class="panel"><h2>계산 방법</h2><ul class="np-how">
-      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `경험치 (100만 = ${opt.xpNp}NP)`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
+      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `경험치 (100만 = ${opt.xpNp}NP)`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP, 역습의 대갈이군에 쓰는 기준)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
         꺼 둔 것은 NP 0으로 보고, NP가 0인 방법은 순위표에서 빠져요. 플래티넘 조각·리더쉽 같은 특별 아이템은 개수 제한이 있어서 넣지 않아요.</li>
       <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
