@@ -281,7 +281,8 @@ function ticketRows(d, sc, now, rareNp) {
   return d.tickets.map(t => {
     const cNp = catTicketNp(rareNp), base = t.cat * cNp + t.rare * rareNp;
     const can = t.catTop > t.cat + 1e-6 || t.rareTop > t.rare + 1e-6, key = `t${t.map}-${t.i}`, on = can && opt.radarOn[key];
-    const gain = (t.catTop - t.cat) * cNp + (t.rareTop - t.rare) * rareNp - RADAR_NP;
+    // 역습의 대갈이군·냥코티켓 찬스는 레이더 가치(1.6NP)를 정한 기준이라 켜든 끄든 같게 0
+    const gain = RADAR_REF.has(t.map) ? 0 : (t.catTop - t.cat) * cNp + (t.rareTop - t.rare) * rareNp - RADAR_NP;
     return {
     group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map), fold: `m${t.map}`,
     sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도 1장에 1번)" : ""}${ONCE_PER_OPEN[t.map] ? ` · ${ONCE_PER_OPEN[t.map]}` : ""}`,
@@ -310,6 +311,7 @@ const EVENT_RATES = {
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 // 트레저 레이더 1개 = 1.6NP: 역습의 대갈이군(2장 70% / 3장 30%)에 쓰면 3장 확정 → 냥코 티켓 0.7장 이득 (커뮤니티 값, 사용자 결정)
 const RADAR_NP = 1.6;
+const RADAR_REF = new Set([1078, 1006]);  // 역습의 대갈이군 · 냥코티켓★찬스
 // 스테이지에 트레저 레이더를 쓰면 드롭이 가장 많은 칸으로 확정. 레이더 1개(1.6NP)를 쓴 만큼 빼서 손익을 보여 준다
 const radarBtn = (key, gain) => `<button class="np-more" data-rd="${key}" aria-pressed="${!!opt.radarOn[key]}" title="트레저 레이더를 쓰면 드롭 확정. 레이더 1개 = ${RADAR_NP}NP를 뺀 손익">트레저 레이더 ${opt.radarOn[key] ? "씀" : "안 씀"} (${gain >= 0 ? "+" : ""}${n2(gain)}NP)</button>`;
 const entryNp = (e, rareNp) => e[2] >= 0 ? e[4] : e[3] === 20 ? catTicketNp(rareNp) : e[3] === 21 ? rareNp
