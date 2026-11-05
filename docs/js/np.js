@@ -10,7 +10,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 const KEY = "nyanko-wiki.np";
 const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
-  npRare: true, npBlue: true, npOrb: true, npXp: false, npRadar: true, xpNp: 0.45, tNp: {}, exPct: null, tab: "rank" };
+  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAd: true, npRadar: true, xpNp: 0.45, tNp: {}, exPct: null, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -29,7 +29,7 @@ const RARE_BEST = RARE_KINDS.find(([k]) => k === "double");  // 레어 티켓 �
 const CAT_GATYA = { false: { orb: 9 / 18, cat: 1 }, true: { orb: 9 / 19, cat: 2 } };
 const ORBS_PER_RARE = 5;
 const catTicketNp = rareNp => { const g = CAT_GATYA[opt.catPlus]; return (opt.npBlue ? g.orb * rareNp / ORBS_PER_RARE : 0) + (1 - g.orb) * g.cat; };
-// 경험치 → NP (사당 환산, 100만당 opt.xpNp NP). 꺼져 있으면 0
+// XP → NP (사당 환산, 100만당 opt.xpNp NP). 꺼져 있으면 0
 const xpNp = xp => opt.npXp ? (xp || 0) / 1e6 * opt.xpNp : 0;
 let XP_ITEMS = {};
 // 스테이지를 깬 뒤 EX 스테이지(통솔력 0)가 나올 확률: 비워 두면 게임 데이터 값, 숫자면 모든 스테이지 같은 확률
@@ -41,7 +41,7 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } cat
 
 const RATE_RARITY = [0, 2, 3, 4, 5];  // 뽑기 확률 순서 [노멀, 레어, 슈레, 울슈레, 레전드] → 레어도 (np.json dupe 순서)
 const TIERS = ["기원", "정점", "비경"];
-const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", lucky: "럭키 티켓", event: "이벤트 티켓", xp: "경험치" };
+const GROUPS = { gatya: "뽑기", beh: "강습", map: "지도·보물섬", ticket: "티켓 스테이지", lucky: "럭키 티켓", event: "이벤트 티켓", xp: "XP" };
 const LUCKY = new Set(["155", "156"]);  // 럭키 티켓 · 럭키 티켓G
 
 const pullNp = (rates, dupe) => rates.reduce((s, [p], i) => s + p / 1e4 * dupe[RATE_RARITY[i]], 0);
@@ -100,9 +100,10 @@ function paintOpt(root, d, rareNp, draw) {
         ["npBlue", "파란구슬 → 레어 티켓", "냥코 뽑기 파란구슬 5개를 레어 티켓으로 바꿔 뽑기. 그 파란구슬 능력이 +10까지 다 올라가 있어야 바꿀 수 있어요 (레어 티켓 뽑기가 켜져 있어야 의미 있음)"],
         ["npOrb", "본능옥 분해", "강습·지도에서 나온 본능옥을 전부 NP로 (끄면 강습·지도는 0)"],
         ["npRadar", "트레저 레이더", "럭키 뽑기에서 나오는 트레저 레이더 1개 = 1.6NP (역습의 대갈이군에 쓰면 냥코 티켓 0.7장 이득)"],
-        ["npXp", "경험치", "스테이지 클리어 경험치·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"]].map(([k, l, t]) =>
+        ["npXp", "XP", "스테이지 클리어 XP·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"],
+        ...(opt.npXp ? [["xpAd", "광고로 XP 2배", "XP 스테이지(게릴라 경험치다냥·토일)에서 광고를 보면 클리어 XP가 2배 (드롭 XP는 그대로)"]] : [])].map(([k, l, t]) =>
         `<button class="chip" data-t="${k}" aria-pressed="${opt[k]}" title="${t}">${l}</button>`).join("")}
-      <label class="np-in"><span>경험치 100만 = NP</span><input type="number" min="0" step="0.01" data-k="xpNp" value="${opt.xpNp}"${opt.npXp ? "" : " disabled"}></label>
+      <label class="np-in"><span>XP 100만 = NP</span><input type="number" min="0" step="0.01" data-k="xpNp" value="${opt.xpNp}"${opt.npXp ? "" : " disabled"}></label>
       <label class="np-in" title="스테이지를 깬 뒤 EX 스테이지(통솔력 0, 티켓 보상)가 나올 확률. 비워 두면 게임 데이터 값(팩맨 1~10%), 숫자를 넣으면 모든 스테이지가 그 확률 (나무위키는 팩맨 각 10%)"><span>EX 스테이지 출현 %</span><input type="number" min="0" max="100" step="1" data-ex value="${opt.exPct ?? ""}" placeholder="데이터"></label>
     </div>
     <div class="row">
@@ -383,13 +384,14 @@ function ticketPanel(d, tg) {
     </tbody></table></div></div>`;
 }
 
-// ---- 경험치 스테이지 (경험치를 NP로 칠 때만) ----
+// ---- XP 스테이지 (XP를 NP로 칠 때만). 광고 2배는 클리어 XP만 (s.ad = 클리어 XP) ----
 function xpRows(d) {
   if (!opt.npXp) return [];
-  return (d.xpStages || []).map(s => ({
-    group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
-    sub: `${s.stage} — XP ${s.xp.toLocaleString()}`, np: xpNp(s.xp), energy: s.energy,
-  }));
+  return (d.xpStages || []).map(s => {
+    const ad = opt.xpAd && s.ad ? s.ad : 0, xp = s.xp + ad;
+    return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
+      sub: `${s.stage} — XP ${xp.toLocaleString()}${ad ? ` (광고 2배: 클리어 ${(2 * ad).toLocaleString()})` : ""}`, np: xpNp(xp), energy: s.energy };
+  });
 }
 
 // ---- 계산 기준 탭: 계산에 쓰는 값마다 출처와 믿을 만한 정도를 한 표로 ----
@@ -428,7 +430,7 @@ function basisHtml(d, tg, rareRaw) {
     ["본능옥·강습", "본능옥 분해 NP", `D ${d.gradeNp[0]} · C ${d.gradeNp[1]} · B ${d.gradeNp[2]} · A ${d.gradeNp[3]} · S ${d.gradeNp[4]}`, "게임 데이터 (equipmentgrade)", "ok"],
     ["본능옥·강습", "강습 EX 출현 확률", "Lv.1 1% … Lv.MAX 기원 59.4 · 정점 30.6 · 비경 10%", "게임 데이터 (EX_group), 나무위키 강습 문서와 일치", "ok"],
     ["환산", "리더쉽 1개", `통조림 ${opt.leaderCans} (통솔력 ${opt.maxEnergy} 채움)`, "설정", "set"],
-    ["환산", "경험치 → NP (사당)", `100만 = ${opt.xpNp}NP${opt.npXp ? "" : " (지금은 안 침)"}`, "커뮤니티 (500만당 약 2.25NP)", "comm"],
+    ["환산", "XP → NP (사당)", `100만 = ${opt.xpNp}NP${opt.npXp ? "" : " (지금은 안 침)"}`, "커뮤니티 (500만당 약 2.25NP)", "comm"],
     ["환산", "트레저 레이더 1개", `${RADAR_NP}NP (역습의 대갈이군에 쓰는 기준)${opt.npRadar ? "" : " — 지금은 안 침"}`, "역습의 대갈이군에 쓰면 냥코 티켓 0.7장 이득 (0.7 × 2.27NP), 커뮤니티 값", "comm"],
   ];
   // 이벤트 뽑기 티켓별 (캐릭이 있는 것만)
@@ -452,7 +454,7 @@ function basisHtml(d, tg, rareRaw) {
       <td data-l="쓰는 값"><small>${esc(val)}</small></td><td data-l="출처"><small>${esc(src)}</small></td></tr>`).join("")}
     </tbody></table></div></div>
     <div class="panel"><h2>계산 방법</h2><ul class="np-how">
-      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `경험치 (100만 = ${opt.xpNp}NP)`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP, 역습의 대갈이군에 쓰는 기준)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
+      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `XP (100만 = ${opt.xpNp}NP${opt.xpAd ? ", XP 스테이지는 광고로 클리어 XP 2배" : ""})`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP, 역습의 대갈이군에 쓰는 기준)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
         꺼 둔 것은 NP 0으로 보고, NP가 0인 방법은 순위표에서 빠져요. 플래티넘 조각·리더쉽 같은 특별 아이템은 개수 제한이 있어서 넣지 않아요.</li>
       <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>

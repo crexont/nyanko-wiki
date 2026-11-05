@@ -271,7 +271,11 @@ def main(argv: list[str] | None = None) -> None:
 
     gacha, gacha_stages, bets = ticket_gacha(D, maps)
 
-    # 경험치 스테이지: 통솔력당 XP가 좋은 맵 (고양이 드링크 스테이지 B는 통솔력이 아니라서 뺀다)
+    # XP 스테이지: 통솔력당 XP가 좋은 맵 (고양이 드링크 스테이지 B는 통솔력이 아니라서 뺀다)
+    # Map_option.csv "XP2倍広告" 열 = 광고를 보면 클리어 XP가 2배인 맵 (게릴라 경험치다냥·토일 스테이지). 드롭 XP는 그대로
+    mo = read(os.path.join(D, "Map_option.csv"))
+    col = mo[0].split(",").index("XP2倍広告")
+    ad_maps = {int(r[0]) for r in (l.split(",") for l in mo[1:]) if len(r) > col and r[0].isdigit() and r[col].strip() == "1"}
     by_map = collections.defaultdict(list)
     for mid, (code, m) in maps.items():
         if code == "B" or mid in SKIP_MAPS:
@@ -279,8 +283,10 @@ def main(argv: list[str] | None = None) -> None:
         for st in m["stages"]:
             xp, e = stage_xp(st), st.get("energy") or 0
             if xp and e > 0:
-                by_map[mid].append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": e, "xp": xp})
-    best = sorted(by_map, key=lambda k: -max(x["xp"] / x["energy"] for x in by_map[k]))
+                ad = mid in ad_maps
+                by_map[mid].append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": e, "xp": xp,
+                                    **({"ad": st.get("xp") or 0} if ad else {})})
+    best = sorted(by_map, key=lambda k: -max((x["xp"] + x.get("ad", 0)) / x["energy"] for x in by_map[k]))
     # 같은 이름으로 다시 열린 맵(복각)은 하나만
     xp_stages, seen = [], set()
     for mid in best:
@@ -310,7 +316,7 @@ def main(argv: list[str] | None = None) -> None:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{out}: 중복 NP {dupe}, 본능옥 NP {grade_np}, EX {ex_np}, 강습 {len(beh_out)}개, "
           f"본능옥 스테이지 {len(orb_maps)}개, 티켓 스테이지 {len(tickets)}개, 드링크 A {drink}통조림, "
-          f"티켓 뽑기 {len(gacha)}종, 티켓 뽑기 스테이지 {len(gacha_stages)}개, 경험치 맵 {len(seen)}개")
+          f"티켓 뽑기 {len(gacha)}종, 티켓 뽑기 스테이지 {len(gacha_stages)}개, XP 맵 {len(seen)}개")
 
 
 if __name__ == "__main__":
