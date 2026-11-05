@@ -10,7 +10,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 const KEY = "nyanko-wiki.np";
 const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100,
   // NP로 칠 것 (켜고 끌 수 있게)
-  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAd: true, npRadar: true, tNp: {}, exPct: null, tab: "rank" };
+  npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
 const RARE_KINDS = [
   ["reg", "정규 레어 뽑기", [69.7, 25, 5, 0.3]],
@@ -33,10 +33,12 @@ const catTicketNp = rareNp => { const g = CAT_GATYA[opt.catPlus]; return (opt.np
 const XP_NP = 0.45;
 const xpNp = xp => opt.npXp ? (xp || 0) / 1e6 * XP_NP : 0;
 let XP_ITEMS = {};
-// 스테이지를 깬 뒤 EX 스테이지(통솔력 0)가 나올 확률: 비워 두면 게임 데이터 값, 숫자면 모든 스테이지 같은 확률
-const exProb = ex => (opt.exPct ?? ex.p) / 100;
+// EX 출현율: 맵마다 직접 정할 수 있음 (비우면 게임 데이터 값). 팩맨은 나무위키·커뮤니티가 "각 10%"라고 해서 기본 10%
+const EX_DEFAULT = { 2271: 10 };
+const exPctOf = s => opt.exMap[s.map] ?? EX_DEFAULT[s.map] ?? s.ex.p;
+const exProb = s => exPctOf(s) / 100;
 // 한 번 클리어할 때 티켓 기대값 (EX 포함)
-const stageTickets = (s, tid) => (s.t[tid] || 0) + (s.ex?.t[tid] ? exProb(s.ex) * s.ex.t[tid] : 0);  // 뽑기에서 나오는 XP 아이템 → XP 양 (np.json)
+const stageTickets = (s, tid) => (s.t[tid] || 0) + (s.ex?.t[tid] ? exProb(s) * s.ex.t[tid] : 0);  // 뽑기에서 나오는 XP 아이템 → XP 양 (np.json)
 const opt = (() => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY)) }; } catch { return { ...DEF }; } })();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } catch {} };
 
@@ -83,7 +85,6 @@ export function renderNp(root) {
 // ---- 환산 기준 ----
 function paintOpt(root, d, rareNp, draw) {
   const box = root.querySelector("#npOpt");
-  const beh = d.behemoth[0]?.stages || [];
   const num = (k, label, step = 1) => `<label class="np-in"><span>${label}</span><input type="number" min="1" step="${step}" data-k="${k}" value="${opt[k]}"></label>`;
   box.innerHTML = `
     <div class="row np-opts">
@@ -92,8 +93,6 @@ function paintOpt(root, d, rareNp, draw) {
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
       <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
       <label class="np-in" title="확률이 서버 데이터에 없는(지금 안 열린) 이벤트 뽑기에서 한정 캐릭터가 나올 확률"><span>지난 이벤트 뽑기 한정 캐릭 %</span><input type="number" min="0" max="100" step="0.1" data-k="eventChar" value="${opt.eventChar}"></label>
-      <label class="np-in"><span>강습 레벨</span><select data-k="lv">${beh.map(s =>
-        `<option value="${s.i}"${s.i === opt.lv ? " selected" : ""}>${s.i === beh.length - 1 ? "Lv.MAX" : `Lv.${s.i + 1}`}</option>`).join("")}</select></label>
     </div>
     <div class="row np-opts">
       <span class="np-lab">NP로 칠 것</span>
@@ -101,15 +100,11 @@ function paintOpt(root, d, rareNp, draw) {
         ["npBlue", "파란구슬 → 레어 티켓", "냥코 뽑기 파란구슬 5개를 레어 티켓으로 바꿔 뽑기. 그 파란구슬 능력이 +10까지 다 올라가 있어야 바꿀 수 있어요 (레어 티켓 뽑기가 켜져 있어야 의미 있음)"],
         ["npOrb", "본능옥 분해", "강습·지도에서 나온 본능옥을 전부 NP로 (끄면 강습·지도는 0)"],
         ["npRadar", "트레저 레이더", "럭키 뽑기에서 나오는 트레저 레이더 1개 = 1.6NP (역습의 대갈이군에 쓰면 냥코 티켓 0.7장 이득)"],
-        ["npXp", "XP", "스테이지 클리어 XP·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"],
-        ...(opt.npXp ? [["xpAd", "광고로 XP 2배", "XP 스테이지(게릴라 경험치다냥·토일)에서 광고를 보면 클리어 XP가 2배 (드롭 XP는 그대로)"]] : [])].map(([k, l, t]) =>
+        ["npXp", "XP", "스테이지 클리어 XP·XP 드롭·뽑기 XP를 사당 환산 비율로 NP에 더하기"]].map(([k, l, t]) =>
         `<button class="chip" data-t="${k}" aria-pressed="${opt[k]}" title="${t}">${l}</button>`).join("")}
-      <label class="np-in" title="스테이지를 깬 뒤 EX 스테이지(통솔력 0, 티켓 보상)가 나올 확률. 비워 두면 게임 데이터 값(팩맨 1~10%), 숫자를 넣으면 모든 스테이지가 그 확률 (나무위키는 팩맨 각 10%)"><span>EX 스테이지 출현 %</span><input type="number" min="0" max="100" step="1" data-ex value="${opt.exPct ?? ""}" placeholder="데이터"></label>
     </div>
     <div class="row">
       ${[["all", "전부"], ...Object.entries(GROUPS).filter(([k]) => k !== "xp" || opt.npXp)].map(([k, l]) => `<button class="chip" data-g="${k}" aria-pressed="${opt.group === k}">${l}</button>`).join("")}
-      <span class="sc-sep"></span>
-      <button class="chip" data-drink aria-pressed="${opt.drink}" title="강습은 30분에 한 번. 바로 다시 하려면 고양이 드링크 A(통조림 ${d.drinkA}개)">강습에 드링크 A 쓰기</button>
     </div>
     <ul class="np-note np-setv">
       <li>리더쉽 1개 = 통솔력 최대치(${opt.maxEnergy}) = 통조림 ${opt.leaderCans}</li>
@@ -119,11 +114,6 @@ function paintOpt(root, d, rareNp, draw) {
       <li>XP 100만 = ${XP_NP}NP — 사당 환산 (500만당 약 2.25NP)</li>
       <li>레어 뽑기 종류별 기준 확률: ${RARE_KINDS.map(([, n, r]) => `${n} ${r.join("/")}`).join(" · ")}</li>
     </ul>`;
-  box.querySelector("[data-ex]").onchange = e => {
-    const v = e.target.value.trim();
-    opt.exPct = v === "" || !(+v >= 0) ? null : Math.min(100, +v);
-    save(); draw();
-  };
   box.querySelectorAll("[data-k]").forEach(el => el.onchange = () => {
     const k = el.dataset.k, v = +el.value;
     if (k === "catPlus") opt.catPlus = v === 1;
@@ -138,7 +128,6 @@ function paintOpt(root, d, rareNp, draw) {
     if (k === "npXp" && !opt.npXp && opt.group === "xp") opt.group = "all";
     save(); draw();
   });
-  box.querySelector("[data-drink]").onclick = () => { opt.drink = !opt.drink; save(); draw(); };
 }
 
 // ---- 표 ----
@@ -164,7 +153,7 @@ function paintBody(root, rows, d, tg, draw) {
   const cost = r => r.bet || [r.energy && `통솔력 ${r.energy}`, r.cans && `통조림 ${+r.cans.toFixed(1)}`].filter(Boolean).join(" + ");
   const val = (r, x) => r.bet ? `<small>1회</small> ${n2(r.np)}` : n2(x);
   const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
-        <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
+        <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${r.extra ? ` ${r.extra}` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
         <td data-l="비용">${cost(r)}</td>
         <td data-l="${E}">${val(r, r.e100)}</td><td data-l="${C}"><b>${val(r, r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
@@ -179,6 +168,18 @@ function paintBody(root, rows, d, tg, draw) {
     root.querySelectorAll(`tr[data-p="${CSS.escape(k)}"]`).forEach(t => t.hidden = !on);
     b.setAttribute("aria-expanded", on);
     b.textContent = b.textContent.replace(/(보기 ▾|접기 ▴)$/, on ? "접기 ▴" : "보기 ▾");
+  });
+  root.querySelectorAll("[data-exm]").forEach(el => el.onchange = () => {
+    const v = el.value.trim();
+    if (v === "" || !(+v >= 0)) delete opt.exMap[el.dataset.exm]; else opt.exMap[el.dataset.exm] = Math.min(100, +v);
+    save(); draw();
+  });
+  root.querySelectorAll("[data-lv]").forEach(el => el.onchange = () => { opt.lv = +el.value; save(); draw(); });
+  root.querySelectorAll("[data-drk]").forEach(b => b.onclick = () => { opt.drink = !opt.drink; save(); draw(); });
+  root.querySelectorAll("[data-ad]").forEach(b => b.onclick = () => {
+    const m = b.dataset.ad;
+    if (opt.xpAdOff[m]) delete opt.xpAdOff[m]; else opt.xpAdOff[m] = true;
+    save(); draw();
   });
   root.querySelectorAll("[data-u]").forEach(el => el.onchange = () => {
     const v = Math.round(+el.value);
@@ -242,6 +243,9 @@ function behRows(d) {
     href: maps.length === 1 ? `#/stage/${maps[0].map}/${s.i}` : null,
     sub: `EX ${TIERS.map((t, k) => s.ex[k] ? `${t} ${pct(s.ex[k])}` : "").filter(Boolean).join(" · ")}${opt.drink ? " · 드링크 A 포함" : ""} — ${maps.map(m => m.name.replace(/ 강습$/, "")).join(", ")}`,
     np: (opt.npOrb ? s.ex.reduce((a, p, k) => a + p / 100 * d.exNp[k], 0) : 0) + xpNp(s.xp), energy: s.energy, cans: opt.drink ? d.drinkA : 0,
+    extra: `<select class="np-lv" data-lv title="강습 레벨">${d.behemoth[0].stages.map(x =>
+      `<option value="${x.i}"${x.i === s.i ? " selected" : ""}>${x.i === d.behemoth[0].stages.length - 1 ? "Lv.MAX" : `Lv.${x.i + 1}`}</option>`).join("")}</select>
+      <button class="np-more" data-drk aria-pressed="${opt.drink}" title="강습은 30분에 한 번. 바로 다시 하려면 고양이 드링크 A(통조림 ${d.drinkA}개)">드링크 A ${opt.drink ? "씀" : "안 씀"}</button>`,
   }));
 }
 
@@ -345,11 +349,12 @@ function eventRows(d, sc, now, tg) {
     const dup = `${s.name}|${s.stage}|${s.energy}|${s.t[tid]}|${JSON.stringify(s.ex)}|${tid}`;
     if (!t || !s.energy || seen.has(dup)) continue;
     seen.add(dup);
-    const exP = s.ex ? exProb(s.ex) : 0, xp = s.xp + (s.ex ? exP * s.ex.xp : 0);
+    const exP = s.ex ? exProb(s) : 0, xp = s.xp + (s.ex ? exP * s.ex.xp : 0);
     const got = [s.t[tid] && `${+s.t[tid].toFixed(2)}장`, s.ex?.t[tid] && exP && `EX ${+(exP * 100).toFixed(1)}% × ${s.ex.t[tid]}장`].filter(Boolean).join(" + ");
     rows.push({ group: LUCKY.has(tid) ? "lucky" : "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
-      np: n * (t.np || 0) + xpNp(xp), energy: s.energy });
+      np: n * (t.np || 0) + xpNp(xp), energy: s.energy,
+      extra: s.ex ? `<label class="np-exin" title="스테이지를 깬 뒤 EX 스테이지가 나올 확률. 게임 데이터 값은 ${s.ex.p}%">EX 출현 <input type="number" min="0" max="100" step="1" data-exm="${s.map}" value="${exPctOf(s)}">%</label>` : "" });
   }
   // 티켓을 걸고 하는 스테이지 (한탕 오락실): 통솔력 0, 건 티켓보다 평균 몇 장 더 받는지(손익)를 NP로
   for (const b of d.bets || []) {
@@ -393,9 +398,10 @@ function ticketPanel(d, tg) {
 function xpRows(d) {
   if (!opt.npXp) return [];
   return (d.xpStages || []).map(s => {
-    const ad = opt.xpAd && s.ad ? s.ad : 0, xp = s.xp + ad;
+    const on = s.ad && !opt.xpAdOff[s.map], ad = on ? s.ad : 0, xp = s.xp + ad;
     return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
-      sub: `${s.stage} — XP ${xp.toLocaleString()}${ad ? ` (광고 2배: 클리어 ${(2 * ad).toLocaleString()})` : ""}`, np: xpNp(xp), energy: s.energy };
+      sub: `${s.stage} — XP ${xp.toLocaleString()}${ad ? ` (광고 2배: 클리어 ${(2 * ad).toLocaleString()})` : ""}`, np: xpNp(xp), energy: s.energy,
+      extra: s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "켜짐" : "꺼짐"}</button>` : "" };
   });
 }
 
@@ -428,7 +434,7 @@ function basisHtml(d, tg, rareRaw) {
     ["럭키·이벤트", "이벤트 뽑기 확정 틀", "대부분 10회마다 한정 캐릭 1개 (고양이 농가 제외)", "나무위키 이벤트 뽑기 문서, game8", "ok"],
     ["럭키·이벤트", "30회 특별 아이템 (레어 티켓·플래티넘 조각 등)", "NP에 안 넣음", "이벤트마다 개수 제한이 있어서 (사용자 결정)", "set"],
     ["스테이지", "스테이지 드롭 확률", "스테이지마다", "게임 데이터, 나무위키 시즌·발굴·육성 스테이지 문서와 대조해 일치", "ok"],
-    ["스테이지", "EX 스테이지 출현율", opt.exPct == null ? "게임 데이터 값 (팩맨 1·2·3·4·5·7·10%)" : `모든 스테이지 ${opt.exPct}% (설정)`, "게임 데이터 (스테이지 파일 \"EX出現率\"). 나무위키·game8은 팩맨 \"약 10%\"", "clash"],
+    ["스테이지", "EX 스테이지 출현율", "게임 데이터 값 (팩맨만 10%, 줄마다 바꿀 수 있음)", "게임 데이터 (스테이지 파일 \"EX出現率\"). 나무위키·game8은 팩맨 \"약 10%\"", "clash"],
     ["스테이지", "한탕 오락실", "10→11.7 · 30→32.5 · 100→125장", "게임 데이터, 나무위키와 일치", "ok"],
     ["스테이지", "역습의 대갈이군 · 대역습의 메타쿠마", "열릴 때마다 1번만", "나무위키 육성 스테이지 문서 · 사용자 확인 (데이터 플래그로는 구분 안 됨)", "ok"],
     ["본능옥·강습", "본능옥 분해 NP", `D ${d.gradeNp[0]} · C ${d.gradeNp[1]} · B ${d.gradeNp[2]} · A ${d.gradeNp[3]} · S ${d.gradeNp[4]}`, "게임 데이터 (equipmentgrade)", "ok"],
@@ -458,13 +464,13 @@ function basisHtml(d, tg, rareRaw) {
       <td data-l="쓰는 값"><small>${esc(val)}</small></td><td data-l="출처"><small>${esc(src)}</small></td></tr>`).join("")}
     </tbody></table></div></div>
     <div class="panel"><h2>계산 방법</h2><ul class="np-how">
-      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `XP (100만 = ${XP_NP}NP${opt.xpAd ? ", XP 스테이지는 광고로 클리어 XP 2배" : ""})`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP, 역습의 대갈이군에 쓰는 기준)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
+      <li>NP로 칠 것: ${[opt.npRare && "레어 티켓 뽑기", opt.npRare && opt.npBlue && "파란구슬 → 레어 티켓", opt.npOrb && "본능옥 분해", opt.npXp && `XP (100만 = ${XP_NP}NP, XP 스테이지는 광고로 클리어 XP 2배 (순위표에서 맵마다 끌 수 있음))`, opt.npRadar && `트레저 레이더 (1개 = ${RADAR_NP}NP, 역습의 대갈이군에 쓰는 기준)`].filter(Boolean).join(", ") || "중복 캐릭만"}.
         꺼 둔 것은 NP 0으로 보고, NP가 0인 방법은 순위표에서 빠져요. 플래티넘 조각·리더쉽 같은 특별 아이템은 개수 제한이 있어서 넣지 않아요.</li>
       <li>중복 캐릭을 NP로 바꾸면 레어 ${d.dupe[2]}, 슈퍼레어 ${d.dupe[3]}, 울트라슈퍼레어 ${d.dupe[4]}, 레전드레어 ${d.dupe[5]} NP. 뽑기는 뽑은 캐릭이 전부 중복이라고 보고 서버 확률로 계산해요.</li>
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
       <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
       <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
-        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (${opt.exPct == null ? "게임 데이터 확률" : `모든 스테이지 ${opt.exPct}%`}). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
+        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (게임 데이터 확률, 팩맨은 10%. 순위표의 그 스테이지 줄에서 바꿀 수 있어요). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
       <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
     </ul></div>`;
 }

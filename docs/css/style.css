@@ -605,4 +605,7 @@ th .np-unit::-webkit-inner-spin-button,th .np-unit::-webkit-outer-spin-button{-w
 .np-st-est{color:#fff;background:var(--danger);border-color:var(--danger)}
 .np-legend{font-size:12.5px;color:var(--muted);line-height:1.9;margin:4px 0 10px}
 .np-basis td:nth-child(3){min-width:150px}
+select.np-lv{margin-top:4px;padding:1px 6px;font-size:12px;border-width:1px;border-radius:6px}
+.np-exin{display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:12px;color:var(--muted)}
+.np-exin input{width:3.6em;padding:1px 4px;font-size:12px;border-width:1px;border-radius:6px}
 .np-how{margin:0;padding-left:18px;font-size:13.5px;line-height:1.75}
