@@ -8,7 +8,7 @@ const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";
-const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100, xpMult: 4.7,
+const DEF = { maxEnergy: 1200, leaderCans: 30, rareCans: 150, catPlus: true, drink: false, lv: 19, group: "all", eventChar: 10, perEnergy: 100, perCans: 100, xpMult: 4.7, xpCombo: false,
   // NP로 칠 것 (켜고 끌 수 있게)
   npRare: true, npBlue: true, npOrb: true, npXp: false, xpAdOff: {}, xpDocOff: {}, radarOn: {}, npRadar: true, tNp: {}, exMap: {}, tab: "rank" };
 // 레어 뽑기 종류별 확률 % [레어, 슈레, 울슈레, 레전드]. 축제는 열려 있을 때만 서버 데이터에 나와서 커뮤니티 정리 값을 쓴다
@@ -93,7 +93,8 @@ function paintOpt(root, d, rareNp, draw) {
       ${num("rareCans", "레어 티켓 1장 = 통조림")}
       <label class="np-in"><span>냥코 뽑기</span><select data-k="catPlus"><option value="0"${opt.catPlus ? "" : " selected"}>기본</option><option value="1"${opt.catPlus ? " selected" : ""}>냥코 뽑기+ (우주편 3장 뒤)</option></select></label>
       <label class="np-in" title="확률이 서버 데이터에 없는(지금 안 열린) 이벤트 뽑기에서 한정 캐릭터가 나올 확률"><span>지난 이벤트 뽑기 한정 캐릭 %</span><input type="number" min="0" max="100" step="0.1" data-k="eventChar" value="${opt.eventChar}"></label>
-      ${opt.npXp ? `<span title="보물(세계편 현자의 돌 등)·학습력 보너스. 기본 4.7 = 보물 다 모은 계정에서 초극악 게릴라 막스테이지 클리어 XP 1,381,800 (고양이 박사 1.5배 포함)을 거꾸로 계산한 값">${num("xpMult", "클리어 XP 보너스 배율", 0.01)}</span>` : ""}
+      ${opt.npXp ? `<span title="(공부력 레벨 + 19) ÷ 20 + 보물(현자의 돌 최대 150% + 뉴트리노 최대 75%). 공부력 Lv30·보물 다 모으면 최대 4.7배 (나무위키 자원 문서, 초극악 게릴라 실측 1,381,800과 일치)">${num("xpMult", "클리어 XP 보너스 배율", 0.01)}</span>
+      <button class="chip" data-t="xpCombo" aria-pressed="${opt.xpCombo}" title="냥콤보 굳잡: 클리어 XP +10% (고양이 박사와 같이 쓰면 1.5 × 1.1 = 1.65배)">굳잡 냥콤보</button>` : ""}
     </div>
     <div class="row np-opts">
       <span class="np-lab">NP로 칠 것</span>
@@ -113,7 +114,7 @@ function paintOpt(root, d, rareNp, draw) {
       <li>냥코 티켓 1장 = ${n2(catTicketNp(opt.npRare ? rareNp : 0))}NP — 파란구슬 ${pct(CAT_GATYA[opt.catPlus].orb * 100)} (${ORBS_PER_RARE}개 = 레어 티켓 1장) + 기본 캐릭 중복 ${CAT_GATYA[opt.catPlus].cat}NP</li>
       <li>트레저 레이더 1개 = ${RADAR_NP}NP — 역습의 대갈이군(2장 70% / 3장 30%)에 써서 3장 확정 = 냥코 티켓 0.7장</li>
       <li>XP 100만 = ${XP_NP}NP — 사당 환산 (500만당 약 2.25NP)</li>
-      <li>XP 스테이지 클리어 XP = 기본 × 보너스 ${opt.xpMult}배 (보물 다 모은 계정 기준, 초극악 게릴라 막스테이지 실측 1,381,800에서 계산) × 광고 2배 × 고양이 박사 1.5배. 드롭 XP엔 아무것도 안 붙음</li>
+      <li>XP 스테이지 클리어 XP = 기본 × 보너스 ${opt.xpMult}배 (공부력·현자의 돌·뉴트리노, 다 채우면 4.7배) × 광고 2배 × 고양이 박사 1.5배 × 굳잡 냥콤보 1.1배, 소수점 버림. 드롭 XP엔 아무것도 안 붙음</li>
       <li>레어 뽑기 종류별 기준 확률: ${RARE_KINDS.map(([, n, r]) => `${n} ${r.join("/")}`).join(" · ")}</li>
     </ul>`;
   box.querySelectorAll("[data-k]").forEach(el => el.onchange = () => {
@@ -429,12 +430,12 @@ function xpRows(d) {
     // 클리어 XP는 광고로 딱 2배, 드롭 XP는 따로 (광고와 상관없음, 트레저 레이더를 쓰면 가장 큰 칸 확정)
     // 고양이 박사(아이템 4번, 비용 0으로 침): 클리어 XP 1.5배, 드롭 XP엔 안 붙음. 기본 켜짐
     const on = s.ad && !opt.xpAdOff[s.map], doc = !opt.xpDocOff[s.map];
-    const clear = Math.round(s.clear * opt.xpMult * (on ? 2 : 1) * (doc ? 1.5 : 1));
+    const clear = Math.floor(s.clear * opt.xpMult * (on ? 2 : 1) * (doc ? 1.5 : 1) * (opt.xpCombo ? 1.1 : 1) + 1e-6);
     const key = `x${s.map}-${s.i}`, rd = s.top && opt.radarOn[key], drop = rd ? s.top : s.drop;
     const gain = s.top ? xpNp(s.top - s.drop) - RADAR_NP : 0;
     const f = n => n.toLocaleString();
     return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
-      sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)} (${[`기본 ${f(s.clear)}`, `보너스 ${opt.xpMult}배`, on && "광고 2배", doc && "고양이 박사 1.5배"].filter(Boolean).join(" × ")}) + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
+      sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)} (${[`기본 ${f(s.clear)}`, `보너스 ${opt.xpMult}배`, on && "광고 2배", doc && "고양이 박사 1.5배", opt.xpCombo && "굳잡 1.1배"].filter(Boolean).join(" × ")}) + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
         + (s.once ? ` · ${f(s.once)} 칸은 맵이 열릴 때마다 1번` : ""),
       np: xpNp(clear + drop) - (rd ? RADAR_NP : 0), energy: s.energy,
       extra: [s.top ? radarBtn(key, gain) : "", s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "ON" : "OFF"}</button>` : "",
