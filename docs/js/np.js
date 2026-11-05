@@ -140,7 +140,7 @@ function paintBody(root, rows, d, tg, draw) {
     if (r.bet) return { ...r, c100: Infinity, e100: Infinity };
     return { ...r, c100: r.np / cans * opt.perCans, e100: r.np / energy * opt.perEnergy };
   };
-  const sorted = rows.filter(r => r.np > 0 && (opt.group === "all" || r.group === opt.group)).map(calc).sort((a, b) => (b.c100 - a.c100) || (b.np - a.np));
+  const sorted = rows.filter(r => (r.np > 0 || /data-rd="[^"]+" aria-pressed="true"/.test(r.extra || "")) && (opt.group === "all" || r.group === opt.group)).map(calc).sort((a, b) => (b.c100 - a.c100) || (b.np - a.np));
   // 같은 맵(fold 키)의 스테이지는 가장 좋은 것 하나만 보이고 나머지는 접어 둔다
   const heads = new Map();
   for (const r of sorted) {
@@ -418,10 +418,16 @@ function ticketPanel(d, tg) {
 function xpRows(d) {
   if (!opt.npXp) return [];
   return (d.xpStages || []).map(s => {
-    const on = s.ad && !opt.xpAdOff[s.map], ad = on ? s.ad : 0, xp = s.xp + ad;
+    // 클리어 XP는 광고로 딱 2배, 드롭 XP는 따로 (광고와 상관없음, 트레저 레이더를 쓰면 가장 큰 칸 확정)
+    const on = s.ad && !opt.xpAdOff[s.map], clear = s.clear * (on ? 2 : 1);
+    const key = `x${s.map}-${s.i}`, rd = s.top && opt.radarOn[key], drop = rd ? s.top : s.drop;
+    const gain = s.top ? xpNp(s.top - s.drop) - RADAR_NP : 0;
+    const f = n => n.toLocaleString();
     return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
-      sub: `${s.stage} — XP ${xp.toLocaleString()}${ad ? ` (광고 2배: 클리어 ${(2 * ad).toLocaleString()})` : ""}`, np: xpNp(xp), energy: s.energy,
-      extra: s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "켜짐" : "꺼짐"}</button>` : "" };
+      sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)}${on ? " (광고 2배)" : ""} + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
+        + (s.once ? ` · 1회 한정 드롭 ${f(s.once)}은 뺌` : ""),
+      np: xpNp(clear + drop) - (rd ? RADAR_NP : 0), energy: s.energy,
+      extra: [s.top ? radarBtn(key, gain) : "", s.ad ? `<button class="np-more" data-ad="${s.map}" aria-pressed="${on}" title="광고를 보면 클리어 XP 2배 (드롭 XP는 그대로)">광고 2배 ${on ? "켜짐" : "꺼짐"}</button>` : ""].filter(Boolean).join(" ") };
   });
 }
 

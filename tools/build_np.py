@@ -289,9 +289,15 @@ def main(argv: list[str] | None = None) -> None:
             xp, e = stage_xp(st), st.get("energy") or 0
             if xp and e > 0:
                 ad = mid in ad_maps
+                # 드롭 XP: 반복 클리어 기대값, 트레저 레이더로 확정되는 가장 큰 칸(top), 1회 한정 칸(once, 초극 게릴라 10% 등)
+                rep = [(n, p) for i, n, p in repeat_drops(st) if i == XP_DROP]
+                d0 = (st.get("drop") or [[0, 0, 0]])[0]
+                once = d0[1] if st.get("dropOnce") and d0[0] == XP_DROP else 0
                 by_map[mid].append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": e, "xp": xp,
-                                    **({"ad": st.get("xp") or 0} if ad else {})})
-    best = sorted(by_map, key=lambda k: -max((x["xp"] + x.get("ad", 0)) / x["energy"] for x in by_map[k]))
+                                    "clear": st.get("xp") or 0, "drop": round(sum(n * p / 100 for n, p in rep)),
+                                    **({"top": max(n for n, p in rep)} if any(p < 100 for n, p in rep) else {}),
+                                    **({"once": once} if once else {}), **({"ad": 1} if ad else {})})
+    best = sorted(by_map, key=lambda k: -max((x["xp"] + (x["clear"] if x.get("ad") else 0)) / x["energy"] for x in by_map[k]))
     # 같은 이름으로 다시 열린 맵(복각)은 하나만
     xp_stages, seen = [], set()
     for mid in best:
