@@ -249,7 +249,7 @@ function renderDropList() {
       .filter(r => r.n).sort((a, b) => (b.ch ?? 0) - (a.ch ?? 0) || (a.energy ?? 999) - (b.energy ?? 999));
     const fresh = list.filter(r => !r.n.includes("(옛 버전)"));
     const LIMIT = 40;
-    box.innerHTML = `<h3 class="sum-title">${itemIcon(dropSel)}${esc(itemName(dropSel))} <small>${fresh.length}곳</small></h3>
+    box.innerHTML = `<h3 class="sum-title">${itemIcon(dropSel)}${esc(itemName(dropSel))} <small>${fresh.length}곳 · <a href="#/item/${dropSel}">통솔력 효율로 보기 ›</a></small></h3>
       ${fresh.length ? `<div class="table-wrap"><table class="sum-table drop-table"><thead><tr><th>스테이지</th><th>확률</th><th>통솔력</th></tr></thead><tbody>
         ${fresh.slice(0, LIMIT).map(r => `<tr><td><small>${esc(r.c)}</small><a href="#/stage/${r.mid}/${r.si}">${esc(r.n)} · ${esc(r.sname)}</a></td>
           <td>${r.all ? "확정" : r.ch != null ? `${r.ch}%` : "-"}</td><td>${r.energy ?? "-"}</td></tr>`).join("")}

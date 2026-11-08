@@ -54,7 +54,7 @@ const bannerName = m => m.replace(/^★확률[^★]*★/, "").replace(/[☆★�
 
 export function renderNp(root) {
   root.innerHTML = `
-    <p class="crumb"><a href="#/">냥코위키</a><i>/</i><span>NP효율</span></p>
+    <p class="crumb"><a href="#/">냥코위키</a><i>/</i><a href="#/items">아이템</a><i>/</i><span>NP효율</span></p>
     <div class="page-head"><div><h1>NP효율</h1><p>NP를 얻는 방법마다 통솔력·리더쉽·통조림 하나에 NP를 얼마나 얻는지 기대값으로 비교해요.</p></div></div>
     <div class="row np-tabs" id="npTabs"></div>
     <div class="filters" id="npOpt"></div>

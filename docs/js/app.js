@@ -9,6 +9,7 @@ import { renderEnemies, renderEnemy, loadEnemies, enemyIcon } from "./enemy.js";
 import { renderStages, renderMap, renderStage } from "./stage.js";
 import { renderSchedule } from "./schedule.js";
 import { renderNp } from "./np.js";
+import { renderItems, renderItem } from "./items.js";
 
 const main = document.getElementById("page");
 let refresh = null;  // 지금 페이지를 다시 그리는 함수 (내 도감 데이터가 바뀌면 호출)
@@ -21,7 +22,7 @@ const NAV = [
   { href: "#/enemies", label: "적", match: /^#\/enem/ },
   { href: "#/stages", label: "스테이지", match: /^#\/stage/ },
   { href: "#/schedule", label: "일정", match: /^#\/schedule/ },
-  { href: "#/np", label: "NP효율", match: /^#\/np/ },
+  { href: "#/items", label: "아이템", match: /^#\/(items?\b|np)/ },
 ];
 
 // 홈 메뉴: [주소, 이름, 짧은 설명, 그림]
@@ -32,7 +33,7 @@ const HOME_MENU = [
   ["#/enemies", "적", "배율·능력·상대 캐릭", "icons/enemy/4.png"],
   ["#/stages", "스테이지", "출현 적·드롭", "icons/enemy/2.png"],
   ["#/schedule", "일정", "스테이지·뽑기 일정", "icons/items/20.png"],
-  ["#/np", "NP효율", "뽑기·강습·지도 NP 비교", "icons/items/7.png"],
+  ["#/items", "아이템", "드롭 효율·NP효율", "icons/items/7.png"],
 ];
 
 function renderHome(root) {
@@ -127,7 +128,10 @@ function route() {
   const cat = h.match(/^#\/cat\/(\d+)/);
   const enemy = h.match(/^#\/enemy\/(\d+)/);
   const stage = h.match(/^#\/stage\/(\d+)(?:\/(\d+))?/);
+  const item = h.match(/^#\/item\/(\d+)/);
   if (cat) refresh = renderCat(main, +cat[1]);
+  else if (item) refresh = renderItem(main, +item[1]);
+  else if (h.startsWith("#/items")) refresh = renderItems(main);
   else if (enemy) refresh = renderEnemy(main, +enemy[1]);
   else if (stage) refresh = stage[2] != null ? renderStage(main, +stage[1], +stage[2]) : renderMap(main, +stage[1]);
   else if (h.startsWith("#/stages")) refresh = renderStages(main);
