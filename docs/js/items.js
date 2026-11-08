@@ -6,7 +6,7 @@ import { loadIndex } from "./stage.js";
 import { loadSchedule, openNow } from "./schedule.js";
 
 let itemsPromise;
-const loadItems = () => itemsPromise ??= fetch("data/items.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+export const loadItems = () => itemsPromise ??= fetch("data/items.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 
 const ITEM_COST = 100000;  // 통솔력 칸이 이 이상이면 아이템 입장 (아이템 × 1000 + 개수)
 const DRINK_MAPS = 14;     // 맵 번호 앞자리 14 = 고양이 드링크 스테이지: 통솔력 칸이 드링크 (종류 × 1000 + 개수)
@@ -62,15 +62,44 @@ export function renderItems(root) {
   return () => draw?.();
 }
 
+// ---- 받는 방식 구분 (아이템 상세·NP효율 공통) ----
+//   rep  = 무한 반복 (클리어할 때마다, 다시 도전까지 간격이 있을 수 있음)
+//   open = 열릴 때마다 1회 (보상 초기화 1·2·3), 고전장 지도 맵은 지도 1장당 1회
+//   one  = 1회성 (초기화 없음)
+export const KIND = { rep: "무한 반복", open: "열릴 때마다 1회", one: "1회성" };
+const KIND_TIP = { rep: "통솔력만 있으면 몇 번이든 돌 수 있는 곳 (뽑기는 통조림)", open: "한 번 받으면 끝이지만 그 맵이 다시 열리면(재개최·고전장 지도) 또 받을 수 있는 곳",
+  one: "계정에서 딱 한 번만 받는 보상" };
+// 켜고 끄기 (이 브라우저에 기억, 아이템 상세와 NP효율이 같이 쓴다)
+const KINDS_KEY = "nyanko-wiki.itemKinds";
+export const kinds = (() => { try { return { rep: true, open: true, one: true, ...JSON.parse(localStorage.getItem(KINDS_KEY)) }; } catch { return { rep: true, open: true, one: true }; } })();
+const saveKinds = () => { try { localStorage.setItem(KINDS_KEY, JSON.stringify(kinds)); } catch {} };
+// 구분 칩 (count(종류) = 줄 수). 누르면 onChange 로 다시 그린다
+export const kindChips = count => `<div class="row it-kinds">${Object.entries(KIND).map(([k, l]) =>
+  `<button class="chip it-kind k-${k}" data-kind="${k}" aria-pressed="${!!kinds[k]}" title="${esc(KIND_TIP[k])}">${l} <small>${count(k)}</small></button>`).join("")}</div>`;
+export const bindKindChips = (root, onChange) => root.querySelectorAll("[data-kind]").forEach(b => b.onclick = () => {
+  kinds[b.dataset.kind] = !kinds[b.dataset.kind]; saveKinds(); onChange();
+});
+const waitText = m => m % 60 ? `${m}분` : `${m / 60}시간`;
+// 구분 태그 + 작은 설명 (r: { kind, byMap, wait, reset, first })
+export const kindTag = r => `<span class="it-tag ${r.kind}">${KIND[r.kind]}</span>${r.byMap ? `<small class="it-first">지도 1장당</small>`
+  : r.wait ? `<small class="it-first" title="한 번 도전한 뒤 다시 도전하려면 기다려야 해요">도전 ${waitText(r.wait)} 간격</small>`
+  : r.kind === "rep" && r.reset === 3 ? `<small class="it-first" title="열릴 때마다 도전 횟수가 초기화되는 맵이에요">도전 횟수 제한</small>`
+  : r.first ? `<small class="it-first">1회 한정 보상</small>` : r.kind !== "rep" ? `<small class="it-first">스테이지 1번 클리어</small>` : ""}`;
+
+// 스테이지를 몇 번 깰 수 있는지 (items.json maps: [보상 초기화 종류, 1회 표시, 다시 도전까지 분, 스테이지 수])
+//   1회 표시가 0이 아니면 스테이지 보상을 한 번만 받는다 (보상 초기화가 있으면 열릴 때마다 다시).
+//   강습(1회 표시 3)도 단계마다 열릴 때마다 1번, 다시 도전까지 간격(30분)은 도전 제한일 뿐 (사용자 확인)
+//   once = 스테이지 자체를 한 번만 (반복 드롭까지 그 한 번에 받는다), kind = 구분
+export function stageRule(d, mid, si) {
+  const pre = Math.floor(mid / 1000);
+  const [reset = 0, flag = 0, wait = 0] = d.maps?.[mid] || [];
+  const once = !!(flag || ONCE_MAPS.has(pre));
+  const byMap = once && !reset && pre === MAP_ITEM;
+  return { reset, once, byMap, wait, kind: !once ? "rep" : reset || byMap ? "open" : "one" };
+}
+
 // ---- 상세: 드롭 스테이지 효율 ----
 const opt = { now: false, old: false, more: {} };
-// 받는 방식 구분 (켜고 끄기, 이 브라우저에 기억)
-const KIND = { rep: "무한 반복", open: "열릴 때마다 1회", one: "1회성" };
-const KIND_TIP = { rep: "통솔력만 있으면 몇 번이든 돌 수 있는 곳", open: "한 번 받으면 끝이지만 그 맵이 다시 열리면(재개최·고전장 지도) 또 받을 수 있는 곳",
-  one: "계정에서 딱 한 번만 받는 보상" };
-const KINDS_KEY = "nyanko-wiki.itemKinds";
-const kinds = (() => { try { return { rep: true, open: true, one: true, ...JSON.parse(localStorage.getItem(KINDS_KEY)) }; } catch { return { rep: true, open: true, one: true }; } })();
-const saveKinds = () => { try { localStorage.setItem(KINDS_KEY, JSON.stringify(kinds)); } catch {} };
 const LIMIT = 50;
 
 // 맵 → 지금 상태: { open: 끝 시각 | true, next: 다음 시작 시각 }
@@ -121,19 +150,12 @@ export function renderItem(root, id) {
       const w = where.get(mid);
       if (!w) continue;
       const pre = Math.floor(mid / 1000), drink = pre === DRINK_MAPS;
-      const [reset = 0, flag0 = 0, wait = 0, nst = 0] = d.maps?.[mid] || [];
       const paid = energy > 0 && energy < ITEM_COST && !drink;  // 통솔력으로 들어가는 스테이지
-      const base = { mid, si, energy, sname, drink, reset, paid, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre) };
+      const rule = stageRule(d, mid, si), reset = rule.reset;
+      const base = { mid, si, energy, sname, drink, reset, paid, wait: rule.wait, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre) };
       const eff = amt => paid ? amt * 1000 / energy : null;
-      // 1회 표시 3 = 강습처럼 단계를 차례로 깨는 맵: 마지막 단계만 반복(간격 있음), 나머지는 단계마다 한 번
-      // 1·2·5 = 한 번 깨면 끝, 단 다시 도전까지 간격(분)이 있으면 그 시간마다 반복
-      const steps = flag0 === 3, lastStep = steps && si === nst - 1;
-      const flag = (steps ? !lastStep : flag0 && !wait) || ONCE_MAPS.has(pre);
-      if (!flag && wait) base.wait = wait;
-      if (flag) {
-        const byMap = !reset && pre === MAP_ITEM;
-        entries.push({ ...base, kind: reset || byMap ? "open" : "one", byMap, amt: per + once, eff: eff(per + once) });
-      } else {
+      if (rule.once) entries.push({ ...base, kind: rule.kind, byMap: rule.byMap, amt: per + once, eff: eff(per + once) });
+      else {
         if (per > 0) entries.push({ ...base, kind: "rep", amt: per, eff: eff(per) });
         if (once > 0) entries.push({ ...base, kind: reset ? "open" : "one", amt: once, first: true, eff: eff(once) });
       }
@@ -151,18 +173,14 @@ export function renderItem(root, id) {
         .sort((a, b) => (b.eff ?? -1) - (a.eff ?? -1) || b.amt - a.amt);
       const shown = opt.more.all ? rs : rs.slice(0, LIMIT);
       const stageCell = r => `<td><small>${esc(r.c)}</small><a href="#/stage/${r.mid}/${r.si}">${esc(r.n)} · ${esc(r.label || r.sname)}</a></td>`;
-      const kindCell = r => `<td><span class="it-tag ${r.kind}">${KIND[r.kind]}</span>${r.byMap ? `<small class="it-first">지도 1장당</small>`
-        : r.kind === "rep" && r.wait ? `<small class="it-first" title="한 번 깬 뒤 다시 도전하려면 기다려야 해요">${r.wait % 60 ? `${r.wait}분` : `${r.wait / 60}시간`}마다</small>`
-        : r.kind === "rep" && r.reset === 3 ? `<small class="it-first" title="열릴 때마다 도전 횟수가 초기화되는 맵이에요">도전 횟수 제한</small>`
-        : r.first ? `<small class="it-first">1회 한정 보상</small>` : r.kind !== "rep" ? `<small class="it-first">스테이지 1번 클리어</small>` : ""}</td>`;
+      const kindCell = r => `<td>${kindTag(r)}</td>`;
       const owned = store.data?.inv ? have(id) : null;
       root.innerHTML = `
         <p class="crumb"><a href="#/">냥코위키</a><i>/</i><a href="#/items">아이템</a><i>/</i><span>${esc(name)}</span></p>
         <div class="page-head it-head"><div>${icon(d, id)}<h1>${esc(name)}</h1><p>드롭 스테이지 ${nStages}곳${owned != null ? ` · 내 보유 ${owned.toLocaleString()}개` : ""}</p></div></div>
         ${id === 7 || id === 6 ? `<p class="note"><a href="#/np">NP효율</a> 페이지에서 ${id === 6 ? "XP 스테이지 효율(보물·광고 배율 포함)도" : "NP"} 볼 수 있어요.</p>` : ""}
         <div class="filters">
-          <div class="row it-kinds">${Object.entries(KIND).map(([k, l]) =>
-            `<button class="chip it-kind k-${k}" data-kind="${k}" aria-pressed="${!!kinds[k]}" title="${esc(KIND_TIP[k])}">${l} <small>${count(k)}</small></button>`).join("")}</div>
+          ${kindChips(count)}
           <div class="row">
             <button class="chip" data-opt="now" aria-pressed="${opt.now}">지금 갈 수 있는 곳만</button>
             <button class="chip" data-opt="old" aria-pressed="${opt.old}">옛 버전 맵 포함</button>
@@ -174,7 +192,7 @@ export function renderItem(root, id) {
           ${rs.length > shown.length ? `<button class="btn it-more" data-more>나머지 ${rs.length - shown.length}곳 더 보기</button>` : ""}</div>`
           : `<div class="empty">조건에 맞는 스테이지가 없어요. 위에서 구분을 켜 보세요.</div>`}
         <p class="note">무한 반복의 받는 개수는 한 번 클리어할 때 기대값, 통솔력 1000당 = 받는 개수 × 1000 ÷ 통솔력이에요 (1회 한정 보상은 그 줄만큼 한 번). 상태: 지금 열림 = 서버 일정 기준 지금 열린 맵, 상시 = 메인·레전드 스토리 등 언제든 갈 수 있는 맵, 요일·시간 = 기간 안이지만 지금 시간대가 아님. 확률은 게임 데이터 그대로이고, 보물·트레저 레이더 효과는 넣지 않았어요.</p>`;
-      root.querySelectorAll("[data-kind]").forEach(b => b.onclick = () => { kinds[b.dataset.kind] = !kinds[b.dataset.kind]; saveKinds(); draw(); });
+      bindKindChips(root, draw);
       root.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => { opt[b.dataset.opt] = !opt[b.dataset.opt]; draw(); });
       root.querySelector("[data-more]")?.addEventListener("click", () => { opt.more.all = true; const y = scrollY; draw(); scrollTo(0, y); });
     };

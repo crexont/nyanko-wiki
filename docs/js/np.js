@@ -2,6 +2,7 @@
 // 게임 데이터 값은 tools/build_np.py 가 만든 data/np.json, 뽑기 확률은 일정 데이터(서버 이벤트)에서.
 import { esc, BYID } from "./common.js";
 import { loadSchedule, openNow } from "./schedule.js";
+import { loadItems, stageRule, kinds, kindChips, bindKindChips, kindTag } from "./items.js";
 
 let npPromise;
 const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
@@ -59,7 +60,7 @@ export function renderNp(root) {
     <div class="row np-tabs" id="npTabs"></div>
     <div class="filters" id="npOpt"></div>
     <div id="npBody"><div class="empty">불러오는 중…</div></div>`;
-  Promise.all([loadNp(), loadSchedule().catch(() => null)]).then(([d, sc]) => {
+  Promise.all([loadNp(), loadSchedule().catch(() => null), loadItems().catch(() => null)]).then(([d, sc, items]) => {
     const now = Date.now();
     const banners = gatyaBanners(sc, d.dupe, now);
     XP_ITEMS = d.xpItems || {};
@@ -71,6 +72,8 @@ export function renderNp(root) {
       const tg = ticketGacha(d, sc, now, rareNp);
       const rows = [...gatyaRows(banners, rareNp, d.dupe), ...behRows(d), ...mapRows(d), ...ticketRows(d, sc, now, rareNp),
         ...eventRows(d, sc, now, tg), ...xpRows(d)];
+      // 받는 방식 구분 (아이템 상세와 같은 기준): 스테이지 줄은 맵 옵션으로, 뽑기·티켓 걸기는 무한 반복
+      for (const r of rows) Object.assign(r, r.mi && items ? stageRule(items, r.mi[0], r.mi[1]) : { kind: "rep" });
       paintTabs(root, draw);
       const optBox = root.querySelector("#npOpt");
       optBox.style.display = opt.tab === "basis" ? "none" : "";  // .filters 의 display 가 hidden 속성을 덮어써서
@@ -143,7 +146,8 @@ function paintBody(root, rows, d, tg, draw) {
     if (r.bet) return { ...r, c100: Infinity, e100: Infinity };
     return { ...r, c100: r.np / cans * opt.perCans, e100: r.np / energy * opt.perEnergy };
   };
-  const sorted = rows.filter(r => (r.np > 0 || /data-rd="[^"]+" aria-pressed="true"/.test(r.extra || "")) && (opt.group === "all" || r.group === opt.group)).map(calc).sort((a, b) => (b.c100 - a.c100) || (b.np - a.np));
+  const inGroup = rows.filter(r => (r.np > 0 || /data-rd="[^"]+" aria-pressed="true"/.test(r.extra || "")) && (opt.group === "all" || r.group === opt.group));
+  const sorted = inGroup.filter(r => kinds[r.kind]).map(calc).sort((a, b) => (b.c100 - a.c100) || (b.np - a.np));
   // 같은 맵(fold 키)의 스테이지는 가장 좋은 것 하나만 보이고 나머지는 접어 둔다
   const heads = new Map();
   for (const r of sorted) {
@@ -157,14 +161,18 @@ function paintBody(root, rows, d, tg, draw) {
   const val = (r, x) => r.bet ? `<small>1회</small> ${n2(r.np)}` : n2(x);
   const tr = (r, sub) => `<tr class="${[r.open && "boss", sub && "np-sub"].filter(Boolean).join(" ")}"${sub ? ` data-p="${esc(r.fold)}"${unfolded.has(r.fold) ? "" : " hidden"}` : ""}>
         <td class="en-name">${sub ? `<small class="np-g">└</small>` : `<small class="np-g">${GROUPS[r.group]}</small>`} ${r.href ? `<a href="${r.href}">${esc(r.name)}</a>` : esc(r.name)}${r.open ? ` <span class="sc-open">지금 열림</span>` : ""}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ""}${r.extra ? ` ${r.extra}` : ""}${!sub && r.more.length ? `<br><button class="np-more" data-f="${esc(r.fold)}" aria-expanded="${unfolded.has(r.fold)}">다른 스테이지 ${r.more.length}개 ${unfolded.has(r.fold) ? "접기 ▴" : "보기 ▾"}</button>` : ""}</td>
+        <td data-l="구분" class="np-kind">${kindTag(r)}</td>
         <td data-l="비용">${cost(r)}</td>
         <td data-l="${E}">${val(r, r.e100)}</td><td data-l="${C}"><b>${val(r, r.c100)}</b></td></tr>`;
   root.querySelector("#npBody").innerHTML = `
+    <div class="filters np-kinds">${kindChips(k => inGroup.filter(r => r.kind === k).length)}</div>
     <div class="panel"><h2>NP효율 순위 <span class="ctl">${list.length}개 · NP / ${C} 순</span></h2>
-      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>비용</th><th>NP / 통솔력 ${unit("perEnergy")}당</th><th>NP / 통조림 ${unit("perCans")}당</th></tr></thead><tbody>
+      ${list.length ? "" : `<p class="note">조건에 맞는 방법이 없어요. 위에서 구분을 켜 보세요.</p>`}
+      <div class="table-wrap"><table class="en-table np-table"><thead><tr><th>방법</th><th>구분</th><th>비용</th><th>NP / 통솔력 ${unit("perEnergy")}당</th><th>NP / 통조림 ${unit("perCans")}당</th></tr></thead><tbody>
       ${list.map(r => tr(r, false) + r.more.map(m => tr(m, true)).join("")).join("")}
       </tbody></table></div></div>
     ${ticketPanel(d, tg)}`;
+  bindKindChips(root, draw);
   root.querySelectorAll(".np-more").forEach(b => b.onclick = () => {
     const k = b.dataset.f, on = !unfolded.has(k);
     on ? unfolded.add(k) : unfolded.delete(k);
@@ -253,7 +261,7 @@ function behRows(d) {
   }
   return [...by.values()].map(({ s, maps }) => ({
     group: "beh", name: `강습 ${s.i === d.behemoth[0].stages.length - 1 ? "Lv.MAX" : `Lv.${s.i + 1}`}${maps.length > 1 ? ` (${maps.length}종)` : ""}`,
-    href: maps.length === 1 ? `#/stage/${maps[0].map}/${s.i}` : null,
+    href: maps.length === 1 ? `#/stage/${maps[0].map}/${s.i}` : null, mi: [maps[0].map, s.i],
     sub: `EX ${TIERS.map((t, k) => s.ex[k] ? `${t} ${pct(s.ex[k])}` : "").filter(Boolean).join(" · ")}${opt.drink ? " · 드링크 A 포함" : ""} — ${maps.map(m => m.name.replace(/ 강습$/, "")).join(", ")}`,
     np: (opt.npOrb ? s.ex.reduce((a, p, k) => a + p / 100 * d.exNp[k], 0) : 0) + xpNp(s.xp), energy: s.energy, cans: opt.drink ? d.drinkA : 0,
     extra: `<select class="np-lv" data-lv title="강습 레벨">${d.behemoth[0].stages.map(x =>
@@ -276,7 +284,7 @@ function mapRows(d) {
   }
   return [...by.values()].map(({ o, island, tier, attrs }) => {
     const g = o.grades.map((p, k) => p ? `${"DCBAS"[k]} ${p}%` : "").filter(Boolean).join(" · ");
-    return { group: "map", name: `${island ? "보물이 잠든 섬" : "지도"} 본능의 ${tier}`, href: `#/stage/${o.map}/${o.i}`,
+    return { group: "map", name: `${island ? "보물이 잠든 섬" : "지도"} 본능의 ${tier}`, href: `#/stage/${o.map}/${o.i}`, mi: [o.map, o.i],
       sub: `${attrs.join("·")} — ${g}`, np: (opt.npOrb ? o.np : 0) + xpNp(o.xp), energy: o.energy };
   });
 }
@@ -292,8 +300,8 @@ function ticketRows(d, sc, now, rareNp) {
     // 역습의 대갈이군·냥코티켓 찬스는 레이더 가치(1.6NP)를 정한 기준이라 켜든 끄든 같게 0
     const gain = RADAR_REF.has(t.map) ? 0 : (t.catTop - t.cat) * cNp + (t.rareTop - t.rare) * rareNp - RADAR_NP;
     return {
-    group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, open: openMaps.has(t.map), fold: `m${t.map}`,
-    sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${t.map >= 25000 ? " (지도 1장에 1번)" : ""}${ONCE_PER_OPEN[t.map] ? ` · ${ONCE_PER_OPEN[t.map]}` : ""}`,
+    group: "ticket", name: t.name, href: `#/stage/${t.map}/${t.i}`, mi: [t.map, t.i], open: openMaps.has(t.map), fold: `m${t.map}`,
+    sub: `${t.stage} — ${[t.cat && `냥코 티켓 ${+t.cat.toFixed(2)}장`, t.rare && `레어 티켓 ${+t.rare.toFixed(2)}장`].filter(Boolean).join(" + ")}${ONCE_PER_OPEN[t.map] ? ` · ${ONCE_PER_OPEN[t.map]}` : ""}`,
     np: base + (on ? gain : 0) + xpNp(t.xp), energy: t.energy,
     extra: can ? radarBtn(key, gain) : "",
   }; });
@@ -373,7 +381,7 @@ function eventRows(d, sc, now, tg) {
     seen.add(dup);
     const exP = s.ex ? exProb(s) : 0, xp = s.xp + (s.ex ? exP * s.ex.xp : 0);
     const got = [s.t[tid] && `${+s.t[tid].toFixed(2)}장`, s.ex?.t[tid] && exP && `EX ${+(exP * 100).toFixed(1)}% × ${s.ex.t[tid]}장`].filter(Boolean).join(" + ");
-    rows.push({ group: LUCKY.has(tid) ? "lucky" : "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
+    rows.push({ group: LUCKY.has(tid) ? "lucky" : "event", name: `${t.name} — ${s.name}`, href: `#/stage/${s.map}/${s.i}`, mi: [s.map, s.i], open: openMaps.has(s.map), fold: `${s.name}|${tid}`,
       sub: `${s.stage} — ${t.name} ${got} × ${n2(t.np || 0)}NP${t.manual ? " (직접 입력)" : t.est ? " (확률 추정)" : ""}${opt.npXp ? ` + XP ${Math.round(xp).toLocaleString()}` : ""}`,
       ...(() => {
         const top = s.top?.[tid], key = `e${s.map}-${s.i}-${tid}`;
@@ -434,7 +442,7 @@ function xpRows(d) {
     const key = `x${s.map}-${s.i}`, rd = s.top && opt.radarOn[key], drop = rd ? s.top : s.drop;
     const gain = s.top ? xpNp(s.top - s.drop) - RADAR_NP : 0;
     const f = n => n.toLocaleString();
-    return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, fold: `xp|${s.name}`,
+    return { group: "xp", name: s.name, href: `#/stage/${s.map}/${s.i}`, mi: [s.map, s.i], fold: `xp|${s.name}`,
       sub: `${s.stage} — XP ${f(clear + drop)} = 클리어 ${f(clear)} (${[`기본 ${f(s.clear)}`, `보너스 ${opt.xpMult}배`, on && "광고 2배", doc && "고양이 박사 1.5배", opt.xpCombo && "굳잡 1.1배"].filter(Boolean).join(" × ")}) + 드롭 ${rd ? "" : "평균 "}${f(drop)}${rd ? " (레이더 확정)" : ""}`
         + (s.once ? ` · ${f(s.once)} 칸은 맵이 열릴 때마다 1번` : ""),
       np: xpNp(clear + drop) - (rd ? RADAR_NP : 0), energy: s.energy,
