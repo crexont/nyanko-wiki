@@ -102,6 +102,13 @@ export function stageRule(d, mid, si) {
 // ---- 상세: 드롭 스테이지 효율 ----
 const opt = { now: false, old: false, more: {} };
 const LIMIT = 50;
+const XP = 6;  // 아이템 6 = XP
+// 레이더·XP 배율 (이 브라우저에 기억). XP 배율은 NP효율 XP 표와 같은 계산
+//   클리어 XP = 기본 × 보너스(공부력·현자의 돌·뉴트리노, 다 채우면 4.7) × 광고 2배(되는 맵만) × 고양이 박사 1.5 × 굳잡 1.1, 버림. 드롭 XP엔 안 붙음
+const BOOST_KEY = "nyanko-wiki.itemBoost";
+const boost = (() => { const def = { radar: false, xpMult: 4.7, doc: true, ad: true, combo: false };
+  try { return { ...def, ...JSON.parse(localStorage.getItem(BOOST_KEY)) }; } catch { return def; } })();
+const saveBoost = () => { try { localStorage.setItem(BOOST_KEY, JSON.stringify(boost)); } catch {} };
 
 // 맵 → 지금 상태: { open: 끝 시각 | true, next: 다음 시작 시각 }
 function mapStatus(sched, now) {
@@ -147,18 +154,19 @@ export function renderItem(root, id) {
     //   one  = 1회성 (초기화 없음)
     // 스테이지 자체를 한 번만 깰 수 있는 곳(아래 flag, + 냥코탑·승단 시험)은 반복 드롭까지 그 한 번에 받는 것으로 본다
     const entries = [];
-    for (const [mid, si, per, once, energy, sname] of list) {
+    for (const [mid, si, per, once, energy, sname, top = 0, clear = 0] of list) {
       const w = where.get(mid);
       if (!w) continue;
       const pre = Math.floor(mid / 1000), drink = pre === DRINK_MAPS;
       const paid = energy > 0 && energy < ITEM_COST && !drink;  // 통솔력으로 들어가는 스테이지
       const rule = stageRule(d, mid, si), reset = rule.reset;
-      const base = { mid, si, energy, sname, drink, reset, paid, wait: rule.wait, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre) };
-      const eff = amt => paid ? amt * 1000 / energy : null;
-      if (rule.once) entries.push({ ...base, kind: rule.kind, byMap: rule.byMap, amt: per + once, eff: eff(per + once) });
+      const base = { mid, si, energy, sname, drink, reset, paid, wait: rule.wait, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre),
+                     per, top, clear, ad: !!d.maps?.[mid]?.[3] };
+      // 받는 개수는 설정(레이더·XP 배율)에 따라 그릴 때 계산한다 (amount)
+      if (rule.once) entries.push({ ...base, kind: rule.kind, byMap: rule.byMap, once });
       else {
-        if (per > 0) entries.push({ ...base, kind: "rep", amt: per, eff: eff(per) });
-        if (once > 0) entries.push({ ...base, kind: reset ? "open" : "one", amt: once, first: true, eff: eff(once) });
+        if (per > 0 || clear > 0) entries.push({ ...base, kind: "rep", once: 0 });
+        if (once > 0) entries.push({ ...base, kind: reset ? "open" : "one", once, first: true, per: 0, top: 0, clear: 0 });
       }
     }
     // 한 맵에 이름이 같은 스테이지가 여러 개면 몇 번째인지 붙인다
@@ -168,7 +176,13 @@ export function renderItem(root, id) {
     const nStages = new Set(entries.map(key)).size;
     const count = k => entries.filter(r => r.kind === k && (opt.old || !r.n.includes("(옛 버전)"))).length;
     const name = d.names[id];
+    // 한 번 클리어(또는 1회 한정 보상 한 번)에 받는 개수: 레이더를 쓰면 드롭은 확정 칸, XP는 클리어 XP에 배율
+    const clearXp = r => r.clear ? Math.floor(r.clear * boost.xpMult * (boost.ad && r.ad ? 2 : 1) * (boost.doc ? 1.5 : 1) * (boost.combo ? 1.1 : 1) + 1e-6) : 0;
+    const radarOn = r => boost.radar && r.top > 0;
+    const amount = r => (radarOn(r) ? r.top : r.per) + r.once + clearXp(r);
     draw = () => {
+      for (const r of entries) { r.amt = amount(r); r.eff = r.paid ? r.amt * 1000 / r.energy : null; }
+      const hasRadar = entries.some(r => r.top > 0), isXp = id === XP;
       // 통솔력 1000당이 있는 줄(통솔력 스테이지)을 위에 효율 순으로, 나머지(드링크·아이템 입장·통솔력 0)는 개수 순으로 아래에
       const rs = entries.filter(r => kinds[r.kind] && (opt.old || !r.n.includes("(옛 버전)")) && (!opt.now || canGo(r)))
         .sort((a, b) => (b.eff ?? -1) - (a.eff ?? -1) || b.amt - a.amt);
@@ -179,22 +193,29 @@ export function renderItem(root, id) {
       root.innerHTML = `
         <p class="crumb"><a href="#/">냥코위키</a><i>/</i><a href="#/items">아이템</a><i>/</i><span>${esc(name)}</span></p>
         <div class="page-head it-head"><div>${icon(d, id)}<h1>${esc(name)}</h1><p>드롭 스테이지 ${nStages}곳${owned != null ? ` · 내 보유 ${owned.toLocaleString()}개` : ""}</p></div></div>
-        ${id === 7 || id === 6 ? `<p class="note"><a href="#/np">NP효율</a> 페이지에서 ${id === 6 ? "XP 스테이지 효율(보물·광고 배율 포함)도" : "NP"} 볼 수 있어요.</p>` : ""}
+        ${id === 7 ? `<p class="note"><a href="#/np">NP효율</a> 페이지에서 NP를 얻는 방법 전체를 비교할 수 있어요.</p>` : ""}
         <div class="filters">
           ${kindChips(count)}
           <div class="row">
             <button class="chip" data-opt="now" aria-pressed="${opt.now}">지금 갈 수 있는 곳만</button>
             <button class="chip" data-opt="old" aria-pressed="${opt.old}">옛 버전 맵 포함</button>
+            ${hasRadar ? `<button class="chip" data-boost="radar" aria-pressed="${boost.radar}" title="트레저 레이더를 쓰면 드롭 중 개수가 가장 많은 칸이 확정돼요 (레이더 1개 소모)">트레저 레이더 쓰기</button>` : ""}
+            ${isXp ? `<button class="chip" data-boost="doc" aria-pressed="${boost.doc}" title="고양이 박사: 클리어 XP 1.5배 (드롭 XP는 그대로)">고양이 박사</button>
+              <button class="chip" data-boost="ad" aria-pressed="${boost.ad}" title="광고를 보면 클리어 XP 2배 (게릴라 경험치다냥 등 되는 맵만)">광고 2배</button>
+              <button class="chip" data-boost="combo" aria-pressed="${boost.combo}" title="냥콤보 굳잡: 클리어 XP +10%">굳잡 냥콤보</button>
+              <label class="np-in" title="(공부력 레벨 + 19) ÷ 20 + 현자의 돌(최대 1.5) + 뉴트리노(최대 0.75). 다 채우면 4.7배"><span>클리어 XP 보너스</span><input type="number" min="1" step="0.01" data-xpm value="${boost.xpMult}"></label>` : ""}
             ${sched ? "" : `<small class="note">일정 데이터를 못 불러와서 "지금 열림"을 알 수 없어요.</small>`}</div></div>
         ${rs.length ? `<div class="panel"><h2>드롭 스테이지 <span class="ctl">${rs.length}곳</span></h2>
           <div class="table-wrap"><table class="sum-table it-table"><thead><tr><th>스테이지</th><th>구분</th><th>상태</th><th>입장</th><th>받는 개수</th><th>통솔력 1000당</th></tr></thead><tbody>
-          ${shown.map(r => `<tr${canGo(r) ? ` class="go"` : ""}>${stageCell(r)}${kindCell(r)}<td>${statusHtml(r)}</td><td>${esc(costText(d, idx, r))}</td>
-            <td>${r.kind === "rep" || !r.first ? "기대 " : ""}${fmtN(r.amt)}개</td><td>${r.eff != null ? `<b>${fmtN(r.eff)}</b>` : "-"}</td></tr>`).join("")}</tbody></table></div>
+          ${shown.map(r => `<tr${canGo(r) ? ` class="go"` : ""}>${stageCell(r)}${kindCell(r)}<td>${statusHtml(r)}</td><td>${esc(costText(d, idx, r))}${radarOn(r) ? `<small class="it-first">+ 트레저 레이더 1개</small>` : ""}</td>
+            <td>${r.first || radarOn(r) && !r.clear ? "" : "기대 "}${fmtN(r.amt)}${isXp ? "" : "개"}${isXp && r.clear ? `<small class="it-first">클리어 ${clearXp(r).toLocaleString()} + 드롭 ${fmtN((radarOn(r) ? r.top : r.per) + r.once)}</small>` : ""}</td><td>${r.eff != null ? `<b>${fmtN(r.eff)}</b>` : "-"}</td></tr>`).join("")}</tbody></table></div>
           ${rs.length > shown.length ? `<button class="btn it-more" data-more>나머지 ${rs.length - shown.length}곳 더 보기</button>` : ""}</div>`
           : `<div class="empty">조건에 맞는 스테이지가 없어요. 위에서 구분을 켜 보세요.</div>`}
-        <p class="note">무한 반복의 받는 개수는 한 번 클리어할 때 기대값, 통솔력 1000당 = 받는 개수 × 1000 ÷ 통솔력이에요 (1회 한정 보상은 그 줄만큼 한 번). 상태: 지금 열림 = 서버 일정 기준 지금 열린 맵, 상시 = 메인·레전드 스토리 등 언제든 갈 수 있는 맵, 요일·시간 = 기간 안이지만 지금 시간대가 아님. 확률은 게임 데이터 그대로이고, 보물·트레저 레이더 효과는 넣지 않았어요.</p>`;
+        <p class="note">무한 반복의 받는 개수는 한 번 클리어할 때 기대값, 통솔력 1000당 = 받는 개수 × 1000 ÷ 통솔력이에요 (1회 한정 보상은 그 줄만큼 한 번). 상태: 지금 열림 = 서버 일정 기준 지금 열린 맵, 상시 = 메인·레전드 스토리 등 언제든 갈 수 있는 맵, 요일·시간 = 기간 안이지만 지금 시간대가 아님. 확률은 게임 데이터 그대로예요.${isXp ? " XP는 클리어 XP(보너스·광고·고양이 박사·굳잡 배율) + 드롭 XP(배율 없음)이고, 드롭 없이 클리어 XP만 주는 스테이지는 효율 좋은 300곳만 넣었어요." : ""}</p>`;
       bindKindChips(root, draw);
       root.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => { opt[b.dataset.opt] = !opt[b.dataset.opt]; draw(); });
+      root.querySelectorAll("[data-boost]").forEach(b => b.onclick = () => { boost[b.dataset.boost] = !boost[b.dataset.boost]; saveBoost(); draw(); });
+      root.querySelector("[data-xpm]")?.addEventListener("change", e => { const v = +e.target.value; if (v >= 1) { boost.xpMult = v; saveBoost(); } draw(); });
       root.querySelector("[data-more]")?.addEventListener("click", () => { opt.more.all = true; const y = scrollY; draw(); scrollTo(0, y); });
     };
     opt.more = {};
