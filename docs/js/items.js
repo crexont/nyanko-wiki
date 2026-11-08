@@ -115,16 +115,21 @@ export function renderItem(root, id) {
     //   rep  = 무한 반복 (클리어할 때마다 확률로)
     //   open = 열릴 때마다 1회 (초기화 1·2·3), 고전장 지도 맵은 지도 1장당 1회
     //   one  = 1회성 (초기화 없음)
-    // 1회 표시가 있는 맵(+ 냥코탑·승단 시험)은 스테이지 자체를 한 번만 깰 수 있어서 반복 드롭까지 그 한 번에 받는 것으로 본다
+    // 스테이지 자체를 한 번만 깰 수 있는 곳(아래 flag, + 냥코탑·승단 시험)은 반복 드롭까지 그 한 번에 받는 것으로 본다
     const entries = [];
     for (const [mid, si, per, once, energy, sname] of list) {
       const w = where.get(mid);
       if (!w) continue;
       const pre = Math.floor(mid / 1000), drink = pre === DRINK_MAPS;
-      const [reset = 0, flag0 = 0] = d.maps?.[mid] || [], flag = flag0 || ONCE_MAPS.has(pre);
+      const [reset = 0, flag0 = 0, wait = 0, nst = 0] = d.maps?.[mid] || [];
       const paid = energy > 0 && energy < ITEM_COST && !drink;  // 통솔력으로 들어가는 스테이지
       const base = { mid, si, energy, sname, drink, reset, paid, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre) };
       const eff = amt => paid ? amt * 1000 / energy : null;
+      // 1회 표시 3 = 강습처럼 단계를 차례로 깨는 맵: 마지막 단계만 반복(간격 있음), 나머지는 단계마다 한 번
+      // 1·2·5 = 한 번 깨면 끝, 단 다시 도전까지 간격(분)이 있으면 그 시간마다 반복
+      const steps = flag0 === 3, lastStep = steps && si === nst - 1;
+      const flag = (steps ? !lastStep : flag0 && !wait) || ONCE_MAPS.has(pre);
+      if (!flag && wait) base.wait = wait;
       if (flag) {
         const byMap = !reset && pre === MAP_ITEM;
         entries.push({ ...base, kind: reset || byMap ? "open" : "one", byMap, amt: per + once, eff: eff(per + once) });
@@ -147,6 +152,7 @@ export function renderItem(root, id) {
       const shown = opt.more.all ? rs : rs.slice(0, LIMIT);
       const stageCell = r => `<td><small>${esc(r.c)}</small><a href="#/stage/${r.mid}/${r.si}">${esc(r.n)} · ${esc(r.label || r.sname)}</a></td>`;
       const kindCell = r => `<td><span class="it-tag ${r.kind}">${KIND[r.kind]}</span>${r.byMap ? `<small class="it-first">지도 1장당</small>`
+        : r.kind === "rep" && r.wait ? `<small class="it-first" title="한 번 깬 뒤 다시 도전하려면 기다려야 해요">${r.wait % 60 ? `${r.wait}분` : `${r.wait / 60}시간`}마다</small>`
         : r.kind === "rep" && r.reset === 3 ? `<small class="it-first" title="열릴 때마다 도전 횟수가 초기화되는 맵이에요">도전 횟수 제한</small>`
         : r.first ? `<small class="it-first">1회 한정 보상</small>` : r.kind !== "rep" ? `<small class="it-first">스테이지 1번 클리어</small>` : ""}</td>`;
       const owned = store.data?.inv ? have(id) : null;

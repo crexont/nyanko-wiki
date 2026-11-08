@@ -5,12 +5,13 @@
 1회 한정이 다시 받아지는지는 맵 옵션으로 나눈다 (DataLocal/Map_option.csv):
   報酬リセットType (BCU MapColc resetMode): 0 초기화 없음, 1 열릴 때마다 보상 초기화,
     2 열릴 때마다 클리어 기록 초기화, 3 열릴 때마다 도전 횟수 초기화.
-  1度きり表示: 0이 아니면 스테이지 자체를 (초기화 전까지) 한 번만 깰 수 있다
-    (강습 Lv 단계, 역습의 대갈이군·대역습의 메타쿠마, 고전장 지도 등. 사이트 items.js 가 분류한다).
+  1度きり表示 + インターバル(분): 사이트 items.js 가 분류한다.
+    3 = 강습처럼 단계를 차례로 깨는 맵 (마지막 단계만 インターバル 분마다 반복),
+    1·2·5 = 스테이지를 한 번 깨면 끝 (インターバル 가 있으면 그 시간 뒤 다시 도전 가능).
 
 출력: docs/data/items.json
   {"names": {아이템: 이름}, "noIcon": [아이콘 그림이 없는 아이템],
-   "maps": {맵: [보상 초기화 종류, 1회 표시] (둘 다 0인 맵은 뺀다)},
+   "maps": {맵: [보상 초기화 종류, 1회 표시, 다시 도전까지 분, 스테이지 수] (앞의 셋이 다 0인 맵은 뺀다)},
    "drops": {아이템: [[맵, 스테이지, 반복 기대 개수, 1회 한정 개수, 통솔력 칸 값, 스테이지 이름], ...]}}
   통솔력 칸 값: 고양이 드링크 스테이지(14000번대)는 드링크(종류×1000 + 개수), 100000 이상은 아이템 입장(아이템×1000 + 개수)
 사용: python tools/build_items.py [--version 15.7.0]
@@ -36,11 +37,11 @@ def built_for() -> str:
 
 
 def map_options(version: str) -> dict[int, list[int]]:
-    """맵 번호 → [보상 초기화 종류, 1회 표시] (Map_option.csv "報酬リセットType", "1度きり表示")."""
+    """맵 번호 → [보상 초기화 종류, 1회 표시, 다시 도전까지 분] (Map_option.csv "報酬リセットType", "1度きり表示", "インターバル")."""
     G, _ = game_data_dir(version)
     lines = read(os.path.join(G, "DataLocal", "Map_option.csv"))
     head = lines[0].split(",")
-    cols = [head.index("報酬リセットType"), head.index("1度きり表示")]
+    cols = [head.index("報酬リセットType"), head.index("1度きり表示"), head.index("インターバル")]
     out = {}
     for l in lines[1:]:
         r = l.split(",")
@@ -58,8 +59,10 @@ def main(argv: list[str] | None = None) -> None:
     idx = json.load(open(os.path.join(STAGES, "index.json"), encoding="utf-8"))
     names = {int(k): v for k, v in idx["items"].items()}
     drops: dict[int, list] = {}
+    n_stages: dict[int, int] = {}
     for _code, maps in stage_files(STAGES):
         for mid, m in maps.items():
+            n_stages[int(mid)] = max((st["i"] for st in m["stages"]), default=-1) + 1
             for st in m["stages"]:
                 d = st.get("drop") or []
                 if not d:
@@ -81,7 +84,7 @@ def main(argv: list[str] | None = None) -> None:
     icons = {int(f[:-4]) for f in os.listdir(os.path.join(SITE, "icons", "items")) if f[:-4].isdigit()}
     out = {"names": {i: names.get(i) or f"아이템 {i}" for i in sorted(drops)},
            "noIcon": [i for i in sorted(drops) if i not in icons],
-           "maps": {m: opts[m] for m in sorted(used) if any(opts.get(m, []))},
+           "maps": {m: opts[m] + [n_stages.get(m, 0)] for m in sorted(used) if any(opts.get(m, []))},
            "drops": {i: drops[i] for i in sorted(drops)}}
     path = os.path.join(SITE, "data", "items.json")
     with open(path, "w", encoding="utf-8", newline="\n") as f:
