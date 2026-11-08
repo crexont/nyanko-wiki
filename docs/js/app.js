@@ -53,8 +53,34 @@ function renderHome(root) {
     <nav class="home-menu" aria-label="바로가기">${HOME_MENU.map(([href, name, sub, img]) =>
       `<a href="${href}"><img src="${img}" alt="" loading="lazy"><b>${name}</b><span>${sub}</span></a>`).join("")}</nav>
     ${homeMine()}
+    ${homeNotice()}
     <p class="home-ver">게임 데이터 v${GD.version}</p>`;
   bindHomeSearch(root);
+  const nd = root.querySelector(".home-notice");
+  nd.addEventListener("toggle", () => {
+    try { localStorage.setItem(NOTICE_KEY, nd.open ? "1" : "0"); } catch {}
+  });
+}
+
+// 인게임 공지: 게임 안 공지 창과 같은 PONOS 페이지를 그대로 띄운다 (CORS가 없어 내용만 가져올 수는 없음)
+const NOTICE_KEY = "nyanko-wiki.homeNotice";
+function noticeUrl() {
+  const [a = 0, b = 0, c = 0] = String(GD.version).split(".").map(Number);
+  const q = new URLSearchParams({
+    platform: "google", clientVersion: String(a * 10000 + b * 100 + c), countryCode: "ko",
+    clearedStageJapan: "100", clearedStageFuture: "100", clearedUniverse: "100", timeDifference: "9",
+  });
+  return `https://nyanko-announcement.ponosgames.com/v1/notices?${q}`;
+}
+function homeNotice() {
+  let open = true;
+  try { open = localStorage.getItem(NOTICE_KEY) !== "0"; } catch {}
+  const url = esc(noticeUrl());
+  return `<details class="panel home-notice"${open ? " open" : ""}>
+      <summary><h2>인게임 공지<a class="ctl" href="${url}" target="_blank" rel="noopener noreferrer">새 창으로 ↗</a></h2></summary>
+      <iframe src="${url}" title="냥코대전쟁 인게임 공지" loading="lazy" referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <p class="note">게임 안 공지 창과 같은 PONOS 페이지를 그대로 보여줘요.</p></details>`;
 }
 
 // 내 도감 요약 (세이브를 안 불러왔으면 안내)
