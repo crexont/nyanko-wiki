@@ -93,7 +93,8 @@ export const kindTag = r => `<span class="it-tag ${r.kind}">${KIND[r.kind]}</spa
 export function stageRule(d, mid, si) {
   const pre = Math.floor(mid / 1000);
   const [reset = 0, flag = 0, wait = 0] = d.maps?.[mid] || [];
-  const once = !!(flag || ONCE_MAPS.has(pre));
+  // 고전장(지도로 여는 맵)은 1회 표시가 없어도 지도 1장에 1번 (사용자 확인: 본능의 기원·정점·비경)
+  const once = !!(flag || ONCE_MAPS.has(pre) || pre === MAP_ITEM);
   const byMap = once && !reset && pre === MAP_ITEM;
   return { reset, once, byMap, wait, kind: !once ? "rep" : reset || byMap ? "open" : "one" };
 }
