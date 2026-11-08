@@ -117,8 +117,12 @@ def drop_chances(drop: list[list[int]], rand: int) -> list | None:
         return None
     if total == 1000:
         return [round(d[0] / 10, 2) for d in drop]
-    if (total == len(drop) and total != 1) or rand == -3:
-        return []
+    # -3 = 전체 중 하나 확정(1회만), -4 = 전체 중 하나 확정(반복). 칸 값은 비율.
+    # 냥코DB "全ドロップから1つ必ず（1回のみ）"·nyanko.wiki(12.5%씩, 1회)로 확인 (2026-11-08).
+    # 전엔 "전부 획득"으로 읽어서 수수께끼의 택배 8칸을 다 받는 것으로 잘못 나왔다.
+    if rand in (-3, -4):
+        return [round(d[0] * 100 / total, 2) for d in drop]
+    # (옛 "칸 값이 다 1이면 전부 획득" 규칙은 뺐다: 남은 곳이 제로 필드 시작의 세계뿐인데 냥코DB·nyanko.wiki 둘 다 각 1%)
     if total == 100:
         return [d[0] for d in drop]
     if total > 100 and rand in (0, 1, 2):
@@ -156,6 +160,8 @@ def parse_reward(row: list[int]) -> dict:
         n = (len(row) - 7) // 3
         drop = [row[5:8]] + [row[6 + i * 3:9 + i * 3] for i in range(1, n)]
     drop = [d for d in drop if len(d) == 3 and d[1] >= 0 and d[2] > 0]
+    if is_time:  # 채점 스테이지의 확률 0 칸은 자리표시 (진짜 드롭은 그대로 둔다)
+        drop = [d for d in drop if d[0] > 0]
     if drop:
         ch = drop_chances(drop, rand)
         out["drop"] = [[REWARD_ALIAS.get(d[1], d[1]), d[2], (ch[k] if ch and k < len(ch) else None)] for k, d in enumerate(drop)]
@@ -163,8 +169,14 @@ def parse_reward(row: list[int]) -> dict:
             out["dropAll"] = 1
         if rand in (1, 2):
             out["dropOnce"] = 1   # 첫 번째 보상은 1회 한정 (2 = 극락 사우나 등, 나무위키 주회 표와 일치)
+        if rand == -3:
+            out["dropPickOnce"] = 1   # 전체 중 하나만, 처음 한 번만 (반복 클리어로는 안 나옴)
+        elif rand == -4:
+            out["dropPick"] = 1       # 클리어할 때마다 전체 중 하나 확정
     if is_time:
-        out["timeDrop"] = [row[16 + i * 3:19 + i * 3] for i in range((len(row) - 17) // 3)]
+        # 채점 보상: [점수, 아이템, 개수]. 점수를 넘기면 받는 1회 보상 (nyanko.wiki "채점보상" oneTime, 냥코DB 1回のみ)
+        out["timeDrop"] = [[s, REWARD_ALIAS.get(i, i), n] for s, i, n in
+                           (row[16 + k * 3:19 + k * 3] for k in range((len(row) - 17) // 3))]
     return out
 
 

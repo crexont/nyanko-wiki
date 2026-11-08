@@ -204,7 +204,11 @@ function paint(root, idx, mid, m, s, byId) {
           ${s.bg ? `<dt>보스 가드</dt><dd>있음 (보스가 있으면 성을 칠 수 없음)</dd>` : ""}
         </dl>${dbStageUrl(mid, s.i) ? `<p style="margin:12px 0 0"><a class="btn" href="${dbStageUrl(mid, s.i)}" target="_blank" rel="noopener">냥코DB에서 보기 ↗</a></p>` : ""}</div>
         ${s.drop?.length ? `<div class="panel"><h2>드롭 보상</h2><div class="rewards">${s.drop.map(d => rewardHtml(idx, d, s.dropAll)).join("")}</div>
+          ${s.dropPickOnce ? `<p class="note">이 중 하나만, 처음 클리어할 때 한 번 받아요.</p>` : s.dropPick ? `<p class="note">클리어할 때마다 이 중 하나가 확정으로 나와요.</p>` : ""}
           ${s.dropOnce ? `<p class="note">첫 번째 보상은 처음 한 번만 얻을 수 있어요.</p>` : ""}</div>` : ""}
+        ${s.timeDrop?.length ? `<div class="panel"><h2>채점 보상</h2><div class="rewards">${s.timeDrop.map(([score, id, n]) =>
+          rewardHtml(idx, [id, n, null], false).replace("</span></span>", `</span><small>${num(score)}점</small></span>`)).join("")}</div>
+          <p class="note">점수를 넘기면 한 번 받아요.</p></div>` : ""}
         ${traits.length ? `<div class="panel"><h2>적 속성</h2>${traitChips(traits)}<div id="counters"></div></div>` : ""}
       </div>
     </div>`;

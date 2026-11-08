@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> None:
             n_stages[int(mid)] = max((st["i"] for st in m["stages"]), default=-1) + 1
             for st in m["stages"]:
                 d = st.get("drop") or []
-                if not d:
+                if not d and not st.get("timeDrop"):
                     if st.get("xp") and 0 < (st.get("energy") or 0) < ITEM_COST:
                         xp_only.append([int(mid), st["i"], 0, 0, st.get("energy"), st["n"], 0, st["xp"]])
                     continue
@@ -81,9 +81,15 @@ def main(argv: list[str] | None = None) -> None:
                 per: dict[int, float] = {}
                 for i, n, p in rep:
                     per[i] = per.get(i, 0) + n * p / 100
-                once: dict[int, int] = {}
-                if st.get("dropOnce") and d[0][2] != 0:
+                once: dict[int, float] = {}
+                if st.get("dropPickOnce"):  # 전체 중 하나, 처음 한 번만: 1회 한정 기대 개수
+                    for i, n, p in d:
+                        once[i] = once.get(i, 0) + n * (p or 0) / 100
+                elif st.get("dropOnce") and d[0][2] != 0:
                     once[d[0][0]] = d[0][1]
+                # 채점 보상 [점수, 아이템, 개수]: 점수를 넘기면 한 번 (전부 받는다고 본다)
+                for _s, i, n in st.get("timeDrop") or []:
+                    once[i] = once.get(i, 0) + n
                 # 트레저 레이더를 쓰면 드롭 중 개수가 가장 많은 칸이 확정 (확률로 나오는 아이템만, build_np 와 같다)
                 top: dict[int, int] = {}
                 for i, n, p in rep:
@@ -93,7 +99,7 @@ def main(argv: list[str] | None = None) -> None:
                     xp_only.append([int(mid), st["i"], 0, 0, st.get("energy"), st["n"], 0, st["xp"]])
                 for i in set(per) | set(once):
                     if 0 <= i < MAX_ITEM:
-                        row = [int(mid), st["i"], round(per.get(i, 0), 4), once.get(i, 0), st.get("energy"), st["n"]]
+                        row = [int(mid), st["i"], round(per.get(i, 0), 4), round(once.get(i, 0), 4), st.get("energy"), st["n"]]
                         t = top.get(i, 0) if top.get(i, 0) > per.get(i, 0) + 1e-6 else 0
                         if i == XP_DROP:
                             row += [t, st.get("xp") or 0]
