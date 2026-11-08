@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     build_stages.main(v)
     build_gatya_sets.main(v)
     build_np.main(v)
-    build_items.main([])
+    build_items.main(v)
     summary(before, snapshot())
 
 
