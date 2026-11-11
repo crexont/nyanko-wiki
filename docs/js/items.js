@@ -154,7 +154,7 @@ export function renderItem(root, id) {
     //   one  = 1회성 (초기화 없음)
     // 스테이지 자체를 한 번만 깰 수 있는 곳(아래 flag, + 냥코탑·승단 시험)은 반복 드롭까지 그 한 번에 받는 것으로 본다
     const entries = [];
-    for (const [mid, si, per, once, energy, sname, top = 0, clear = 0] of list) {
+    for (const [mid, si, per, once, energy, sname, top = 0, clear = 0, single = 0, topAll = 0] of list) {
       const w = where.get(mid);
       if (!w) continue;
       const pre = Math.floor(mid / 1000), drink = pre === DRINK_MAPS;
@@ -163,7 +163,8 @@ export function renderItem(root, id) {
       const base = { mid, si, energy, sname, drink, reset, paid, wait: rule.wait, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre),
                      per, top, clear, ad: !!d.maps?.[mid]?.[3] };
       // 받는 개수는 설정(레이더·XP 배율)에 따라 그릴 때 계산한다 (amount)
-      if (rule.once) entries.push({ ...base, kind: rule.kind, byMap: rule.byMap, once });
+      // 한 번만 깨는 스테이지: 처음 깰 때 확률 그대로 (드롭 칸 중 하나만 나옴, 레이더는 그중 가장 많은 칸)
+      if (rule.once) entries.push({ ...base, kind: rule.kind, byMap: rule.byMap, per: single, top: topAll, once: 0 });
       else {
         if (per > 0 || clear > 0) entries.push({ ...base, kind: "rep", once: 0 });
         if (once > 0) entries.push({ ...base, kind: reset ? "open" : "one", once, first: true, per: 0, top: 0, clear: 0 });

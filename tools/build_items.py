@@ -12,8 +12,10 @@
 출력: docs/data/items.json
   {"names": {아이템: 이름}, "noIcon": [아이콘 그림이 없는 아이템],
    "maps": {맵: [보상 초기화 종류, 1회 표시, 다시 도전까지 분, 광고 XP 2배, 스테이지 수] (앞의 넷이 다 0인 맵은 뺀다)},
-   "drops": {아이템: [[맵, 스테이지, 반복 기대 개수, 1회 한정 개수, 통솔력 칸 값, 스테이지 이름, (레이더 확정 개수), (XP만: 클리어 XP)], ...]}}
-  레이더 확정 개수: 트레저 레이더를 쓰면 확정되는 개수 (기대값보다 클 때만, 없으면 0 또는 생략)
+   "drops": {아이템: [[맵, 스테이지, 반복 기대 개수, 1회 한정 개수, 통솔력 칸 값, 스테이지 이름,
+                       레이더 확정 개수, 클리어 XP(XP만, 아니면 0), 처음 한 번 깰 때 기대 개수, 그때 레이더 확정 개수], ...]}}
+  레이더 확정 개수: 트레저 레이더를 쓰면 확정되는 개수 (기대값보다 클 때만, 아니면 0). 드롭 없는 XP 스테이지 줄은 앞 8칸만.
+  처음 한 번: 1회 칸도 저장된 확률 그대로(칸 중 하나만 나옴) + 채점 보상. 한 번만 깰 수 있는 스테이지에 쓴다.
   통솔력 칸 값: 고양이 드링크 스테이지(14000번대)는 드링크(종류×1000 + 개수), 100000 이상은 아이템 입장(아이템×1000 + 개수)
 사용: python tools/build_items.py [--version 15.7.0]
 """
@@ -95,16 +97,29 @@ def main(argv: list[str] | None = None) -> None:
                 for i, n, p in rep:
                     if p < 100:
                         top[i] = max(top.get(i, 0), n)
+                # 처음 한 번 클리어할 때의 기대값 (1회 칸도 저장된 확률 그대로, 칸 중 하나만 나온다) + 채점 보상.
+                # 스테이지를 한 번만 깰 수 있는 맵(초극악 게릴라 등)은 이 값을 쓴다 (사이트 items.js).
+                # 전엔 per(1회 칸 받은 뒤 반복 기대값) + once(1회 칸 개수 전체)를 더해서 초극악 게릴라 XP가 크게 나왔다.
+                single: dict[int, float] = {}
+                top_all: dict[int, int] = {}  # 한 번 깰 때 레이더를 쓰면 확정되는 칸 (1회 칸 포함)
+                if st.get("dropPickOnce"):
+                    single = dict(once)
+                else:
+                    for i, n, p in d:
+                        if p:
+                            single[i] = single.get(i, 0) + n * p / 100
+                            if p < 100:
+                                top_all[i] = max(top_all.get(i, 0), n)
+                    for _s, i, n in st.get("timeDrop") or []:
+                        single[i] = single.get(i, 0) + n
                 if st.get("xp") and XP_DROP not in per and XP_DROP not in once and 0 < (st.get("energy") or 0) < ITEM_COST:
                     xp_only.append([int(mid), st["i"], 0, 0, st.get("energy"), st["n"], 0, st["xp"]])
                 for i in set(per) | set(once):
                     if 0 <= i < MAX_ITEM:
                         row = [int(mid), st["i"], round(per.get(i, 0), 4), round(once.get(i, 0), 4), st.get("energy"), st["n"]]
                         t = top.get(i, 0) if top.get(i, 0) > per.get(i, 0) + 1e-6 else 0
-                        if i == XP_DROP:
-                            row += [t, st.get("xp") or 0]
-                        elif t:
-                            row.append(t)
+                        ta = top_all.get(i, 0) if top_all.get(i, 0) > single.get(i, 0) + 1e-6 else 0
+                        row += [t, (st.get("xp") or 0) if i == XP_DROP else 0, round(single.get(i, 0), 4), ta]
                         drops.setdefault(i, []).append(row)
     # XP: 드롭 없는 스테이지는 클리어 XP ÷ 통솔력 상위 XP_ONLY 개만 (옛 버전 맵 제외)
     old = {m[0] for c in idx["categories"] for m in c["maps"] if "(옛 버전)" in m[1]}
