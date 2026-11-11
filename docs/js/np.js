@@ -60,7 +60,13 @@ export function renderNp(root) {
     <div class="row np-tabs" id="npTabs"></div>
     <div class="filters" id="npOpt"></div>
     <div id="npBody"><div class="empty">불러오는 중…</div></div>`;
-  Promise.all([loadNp(), loadSchedule().catch(() => null), loadItems().catch(() => null)]).then(([d, sc, items]) => {
+  Promise.all([loadNp(), loadSchedule().catch(() => null), loadItems().catch(() => null)]).then(([d0, sc, items]) => {
+    // 한 번만 깨는 스테이지(stageRule once: 강습형 이벤트·초극 게릴라 등)는 반복 기대값 대신 처음 깰 때 값("f")을 쓴다.
+    // 1회 칸이 100%면 처음엔 그 칸만 나와서, 반복 값(받은 뒤 확률)과 다르다. 레이더는 처음 깰 때 값 기준으로 안 셈.
+    const once = (m, i) => !!items && stageRule(items, m, i).once;
+    const d = { ...d0,
+      tickets: d0.tickets.map(t => t.f && once(t.map, t.i) ? { ...t, cat: t.f[0], rare: t.f[1], catTop: t.f[0], rareTop: t.f[1] } : t),
+      gachaStages: d0.gachaStages.map(s => s.f && once(s.map, s.i) ? { ...s, t: s.f, top: undefined } : s) };
     const now = Date.now();
     const banners = gatyaBanners(sc, d.dupe, now);
     XP_ITEMS = d.xpItems || {};

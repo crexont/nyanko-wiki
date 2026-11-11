@@ -104,6 +104,11 @@ def main(argv: list[str] | None = None) -> None:
                 top_all: dict[int, int] = {}  # 한 번 깰 때 레이더를 쓰면 확정되는 칸 (1회 칸 포함)
                 if st.get("dropPickOnce"):
                     single = dict(once)
+                elif st.get("dropOnce") and d and d[0][2] == 100:
+                    # 1회 칸이 100%면 처음 깰 때는 그것만 나온다 (나머지 칸 확률은 받은 뒤 기준, nyanko.wiki 미획득 0%)
+                    single = {d[0][0]: d[0][1]}
+                    for _s, i, n in st.get("timeDrop") or []:
+                        single[i] = single.get(i, 0) + n
                 else:
                     for i, n, p in d:
                         if p:

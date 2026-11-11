@@ -55,6 +55,30 @@ def repeat_drops(st: dict) -> list:
     return [x for x in d if x[2]]
 
 
+def first_clear(st: dict) -> tuple[dict, dict]:
+    """처음 한 번 깰 때(1회 보상을 아직 안 받았을 때) 아이템별 기대 개수와 레이더 확정 개수.
+    드롭 칸 중 하나만 나온다(저장된 최종 확률 그대로). 1회 칸이 100%면 그 칸만 나온다
+    (나머지 칸 확률은 받은 뒤 기준, nyanko.wiki 미획득 0%). 채점 보상도 더한다.
+    한 번만 깰 수 있는 스테이지(사이트 stageRule once)는 이 값을 쓴다."""
+    d = st.get("drop") or []
+    exp: dict[int, float] = {}
+    top: dict[int, int] = {}
+    if st.get("dropPickOnce"):
+        for i, n, p in d:
+            exp[i] = exp.get(i, 0) + n * (p or 0) / 100
+    elif st.get("dropOnce") and d and d[0][2] == 100:
+        exp[d[0][0]] = d[0][1]
+    else:
+        for i, n, p in d:
+            if p:
+                exp[i] = exp.get(i, 0) + n * p / 100
+                if p < 100:
+                    top[i] = max(top.get(i, 0), n)
+    for _s, i, n in st.get("timeDrop") or []:
+        exp[i] = exp.get(i, 0) + n
+    return exp, {i: t for i, t in top.items() if t > exp.get(i, 0) + 1e-6}
+
+
 def stage_xp(st: dict) -> int:
     """한 번 클리어할 때 XP 기대값: 클리어 경험치(보물·아이템 보너스 전) + XP 드롭."""
     return round((st.get("xp") or 0) + sum(n * p / 100 for i, n, p in repeat_drops(st) if i == XP_DROP))
@@ -167,16 +191,20 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
             ex, exr = None, ex_value(D, code, mid, st["i"], gacha)
             if exr and exr[1]:
                 ex = {"p": exr[0], "t": {k: round(v, 3) for k, v in exr[1].items()}, "xp": round(exr[2])}
+            # 처음 한 번 깰 때 티켓 기대값 (한 번만 깨는 스테이지용, 반복 값과 다를 때만 "f")
+            f1 = {str(i): round(v, 3) for i, v in first_clear(st)[0].items() if str(i) in gacha}
             e = st.get("energy") or 0
             if e >= ITEM_COST:
                 # 티켓을 걸고 들어가는 스테이지 (한탕 오락실): 통솔력이 안 들어서 순위 대신 "n개 걸면 평균 m개"로 보여 준다
                 if got:
                     bets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "item": e // 1000, "cost": e % 1000,
                                  "t": {k: round(v, 3) for k, v in got.items()}})
-            elif got or ex:
+            elif got or ex or f1:
+                t = {k: round(v, 3) for k, v in got.items()}
                 stages.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
-                               "t": {k: round(v, 3) for k, v in got.items()}, **({"ex": ex} if ex else {}),
-                               **({"top": top} if any(top[k] > got[k] + 1e-6 for k in top) else {})})
+                               "t": t, **({"ex": ex} if ex else {}),
+                               **({"top": top} if any(top[k] > got[k] + 1e-6 for k in top) else {}),
+                               **({"f": f1} if f1 != t else {})})
     return gacha, stages, bets
 
 
@@ -269,9 +297,13 @@ def main(argv: list[str] | None = None) -> None:
             d = [x for x in st.get("drop") or [] if x[2]] if mid in OPEN_ONCE else repeat_drops(st)
             cat = sum(n * p / 100 for item, n, p in d if item == CAT_TICKET)
             rare = sum(n * p / 100 for item, n, p in d if item == RARE_TICKET)
-            if cat or rare:
+            f1 = first_clear(st)[0]  # 처음 한 번 깰 때 (한 번만 깨는 스테이지용)
+            fcat, frare = round(f1.get(CAT_TICKET, 0), 3), round(f1.get(RARE_TICKET, 0), 3)
+            # 통솔력 0인 곳(승단 시험 등 1회성)은 통솔력당 비교가 안 돼서 뺀다
+            if (cat or rare or fcat or frare) and (st.get("energy") or 0) > 0:
                 tickets.append({"map": mid, "i": st["i"], "name": m["n"], "stage": st["n"], "energy": st.get("energy"), "xp": stage_xp(st),
                                 "cat": round(cat, 3), "rare": round(rare, 3),
+                                **({"f": [fcat, frare]} if (fcat, frare) != (round(cat, 3), round(rare, 3)) else {}),
                                 # 트레저 레이더를 쓰면 확정되는 개수 (드롭이 확률일 때만 의미 있음)
                                 "catTop": max([n for item, n, p in d if item == CAT_TICKET] or [0]),
                                 "rareTop": max([n for item, n, p in d if item == RARE_TICKET] or [0])})
