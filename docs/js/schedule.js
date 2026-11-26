@@ -100,11 +100,12 @@ export function renderSchedule(root) {
     const fetched = Date.parse(data.fetchedAt);
     const mins = Math.max(0, Math.round((Date.now() - fetched) / 6e4));
     root.querySelector("#scMeta").textContent = `${mins < 60 ? `${mins}분` : `${Math.round(mins / 60)}시간`} 전 갱신 · 서버 게임 버전 ${data.gameVersion}`;
-    const now = Date.now(), today = dayOf(now);
-    const rows = [...gatyaRows(data.gatya, sets), ...stageRows(data.sale, maps, dropsByMap, now), ...itemRows(data.item)];
-    if (ui.month == null) { const [y, m] = ymd(today); ui.month = y * 12 + m; }
-    if (ui.day == null) ui.day = today;
+    if (ui.month == null) { const [y, m] = ymd(dayOf(Date.now())); ui.month = y * 12 + m; }
+    if (ui.day == null) ui.day = dayOf(Date.now());
     draw = () => {
+      // 지금 시각은 그릴 때마다 다시 잰다 (탭을 오래 열어 두면 "지금 열림"·남은 시간이 어긋나지 않게)
+      const now = Date.now(), today = dayOf(now);
+      const rows = [...gatyaRows(data.gatya, sets), ...stageRows(data.sale, maps, dropsByMap, now), ...itemRows(data.item)];
       const dex = hasDex();
       if (!dex) ui.onlyNew = false;
       const tabs = [["today", "오늘"], ["cal", "달력"], ["list", "목록"]].map(([k, l]) => `<button class="chip" data-view="${k}" aria-pressed="${ui.view === k}">${l}</button>`).join("");
@@ -154,7 +155,7 @@ export function renderSchedule(root) {
       });
     };
     draw();
-  }).catch(() => { root.querySelector("#scBody").innerHTML = `<div class="empty">일정 데이터를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</div>`; });
+  }).catch(e => { console.error(e); root.querySelector("#scBody").innerHTML = `<div class="empty">일정 데이터를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</div>`; });
   return () => draw?.();  // 내 도감이 바뀌면 ★ 표시를 다시 계산
 }
 

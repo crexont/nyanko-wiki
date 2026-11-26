@@ -91,7 +91,7 @@ export function renderStages(root) {
     };
     root.querySelector("#sQ").oninput = e => { ui.q = e.target.value.trim(); draw(); };
     draw();
-  }).catch(() => failed(root, "스테이지"));
+  }).catch(e => { console.error(e); failed(root, "스테이지"); });
   return null;
 }
 
@@ -117,7 +117,7 @@ export function renderMap(root, mid) {
           <span class="ens">${show.map(e => enemyIcon(e, "sm")).join("")}</span></a>`;
       }).join("")}</div>`;
     document.title = `${m.n} - 냥코위키`;
-  }).catch(() => failed(root, "스테이지"));
+  }).catch(e => { console.error(e); failed(root, "스테이지"); });
   return null;
 }
 
@@ -132,7 +132,7 @@ export function renderStage(root, mid, si) {
     const m = cat?.[mid], s = m?.stages.find(x => x.i === si);
     if (!s) { root.innerHTML = `<div class="empty">스테이지를 찾을 수 없어요. <a href="#/stages">스테이지 목록으로</a></div>`; return; }
     paint(root, idx, mid, m, s, en.byId);
-  }).catch(() => failed(root, "스테이지"));
+  }).catch(e => { console.error(e); failed(root, "스테이지"); });
   draw();
   return draw;
 }
@@ -251,7 +251,7 @@ function paintMine(root, rows, enemies, traits) {
         ? `<div class="counter-list">${fit.map(x => `<a href="#/cat/${x.c.id}"><img class="eicon sm cat" src="icons/${x.c.id}_${x.fi}.png" alt=""><span>${esc(x.name)}<small>${x.hit.join("·")} · ${x.keys.join("·")}</small></span></a>`).join("")}</div>`
         : `<p class="note" style="margin:0">내 캐릭 중 이 속성을 타겟으로 하는 캐릭이 없어요.</p>`}`;
     }
-  }).catch(() => { box.innerHTML = `<h2>사거리 비교</h2><p class="note">캐릭터 데이터를 불러오지 못했어요.</p>`; });
+  }).catch(e => { console.error(e); box.innerHTML = `<h2>사거리 비교</h2><p class="note">캐릭터 데이터를 불러오지 못했어요.</p>`; });
 }
 
 function rangeBars(items, max) {

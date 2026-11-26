@@ -253,5 +253,5 @@ function renderDropList() {
       </tbody></table></div>${fresh.length > LIMIT ? `<p class="note">확률 높은 ${LIMIT}곳만 보여줘요.</p>` : ""}`
       : `<p class="note" style="margin:0">이 재료를 드롭하는 스테이지를 찾지 못했어요.</p>`}
       <p class="note">이벤트·요일 스테이지는 열려 있는 기간에만 갈 수 있어요. 확률은 한 번 클리어했을 때 기준이에요.</p>`;
-  }).catch(() => { box.innerHTML = `<p class="note" style="margin:0">드롭 데이터를 불러오지 못했어요.</p>`; });
+  }).catch(e => { console.error(e); box.innerHTML = `<p class="note" style="margin:0">드롭 데이터를 불러오지 못했어요.</p>`; });
 }

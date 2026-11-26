@@ -85,7 +85,7 @@ export function renderNp(root) {
       else { paintOpt(root, d, rareRaw, draw); paintBody(root, rows, d, tg, draw); }
     };
     draw();
-  }).catch(() => { root.querySelector("#npBody").innerHTML = `<div class="empty">데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
+  }).catch(e => { console.error(e); root.querySelector("#npBody").innerHTML = `<div class="empty">데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
   return null;
 }
 

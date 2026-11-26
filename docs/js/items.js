@@ -54,7 +54,7 @@ export function renderItems(root) {
     };
     root.querySelector("#iQ").addEventListener("input", e => { ui.q = e.target.value; draw(); });
     draw();
-  }).catch(() => failed(root.querySelector("#iList")));
+  }).catch(e => { console.error(e); failed(root.querySelector("#iList")); });
   return () => draw?.();
 }
 
@@ -212,6 +212,6 @@ export function renderItem(root, id) {
     opt.more = {};
     draw();
     document.title = `${name} - 냥코위키`;
-  }).catch(() => failed(root));
+  }).catch(e => { console.error(e); failed(root); });
   return () => draw?.();
 }

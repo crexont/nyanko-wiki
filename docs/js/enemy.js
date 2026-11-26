@@ -70,7 +70,7 @@ export function renderEnemies(root) {
     root.querySelector("#eSort").onchange = e => { ui.sort = e.target.value; draw(); };
     root.querySelector("#eHidden").onchange = e => { ui.hidden = e.target.checked; draw(); };
     filters(); draw();
-  }).catch(() => { root.querySelector("#eGrid").innerHTML = `<div class="empty">적 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
+  }).catch(e => { console.error(e); root.querySelector("#eGrid").innerHTML = `<div class="empty">적 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
   return null;
 }
 
@@ -105,7 +105,7 @@ export function renderEnemy(root, id) {
     const e = byId.get(id);
     if (!e) { root.innerHTML = `<div class="empty">적을 찾을 수 없어요. <a href="#/enemies">적 목록으로</a></div>`; return; }
     paint(root, e);
-  }).catch(() => { root.innerHTML = `<div class="empty">적 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
+  }).catch(e => { console.error(e); root.innerHTML = `<div class="empty">적 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; });
   return null;
 }
 
