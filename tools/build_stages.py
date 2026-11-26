@@ -314,58 +314,42 @@ def main(argv: list[str] | None = None) -> None:
             json.dump(cat_out, f, ensure_ascii=False, separators=(",", ":"))
         index.append({"code": code, "name": title, "maps": maps})
 
-    # 스테이지 이름 검색용: {맵 번호: [[스테이지 번호, 이름], ...]} (스테이지 목록 페이지에서 검색할 때만 받는다)
-    names_out: dict[int, list] = {}
-    for f in os.listdir(out_dir):
-        if f.endswith(".json") and f not in SKIP_FILES:
-            for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
-                names_out[int(mid)] = [[st["i"], st["n"]] for st in m["stages"]]
-    with open(os.path.join(out_dir, "stage_names.json"), "w", encoding="utf-8") as f:
-        json.dump(names_out, f, ensure_ascii=False, separators=(",", ":"))
-
-    # 적 → 등장 스테이지 (적 상세 페이지용): {적 ID: [[맵 번호, [스테이지 번호, ...]], ...]}
-    appear: dict[int, dict[int, list[int]]] = {}
-    for f in os.listdir(out_dir):
-        if f.endswith(".json") and f not in SKIP_FILES:
-            for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
-                for st in m["stages"]:
-                    for e in st["en"]:
-                        lst = appear.setdefault(e[0], {}).setdefault(int(mid), [])
-                        if st["i"] not in lst:
-                            lst.append(st["i"])
-    with open(os.path.join(out_dir, "enemy_stages.json"), "w", encoding="utf-8") as f:
-        json.dump({eid: sorted(maps.items()) for eid, maps in appear.items()}, f, separators=(",", ":"))
-
-    # 드롭 보상 번호 1000 이상 = 캐릭 (drop_chara.csv: 드롭 번호 → 캐릭 ID). 캐릭 → 드롭 스테이지 목록도 만든다
+    # 드롭 보상 번호 1000 이상 = 캐릭 (drop_chara.csv: 드롭 번호 → 캐릭 ID)
     drop_chara = {}
     for l in read(os.path.join(D, "drop_chara.csv"))[1:]:
         r = [x.strip() for x in l.split(",")]
         if len(r) >= 3 and r[0].lstrip("-").isdigit() and int(r[0]) >= 0:
             drop_chara[int(r[0])] = int(r[2])
-    cat_drops: dict[int, list] = {}
-    for f in os.listdir(out_dir):
-        if f.endswith(".json") and f not in SKIP_FILES:
-            for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
-                for st in m["stages"]:
-                    for d in st.get("drop", []):
-                        if d[0] >= 1000 and d[0] in drop_chara:
-                            cat_drops.setdefault(drop_chara[d[0]], []).append([int(mid), st["i"], d[2], st.get("dropAll", 0), st["n"]])
-    with open(os.path.join(out_dir, "cat_drops.json"), "w", encoding="utf-8") as f:
-        json.dump({k: sorted(v) for k, v in cat_drops.items()}, f, separators=(",", ":"))
 
-    # 아이템(번호 < 1000) → 드롭 스테이지 (육성 페이지 "재료 드롭 스테이지"용):
-    # {아이템: [[맵, 스테이지, 확률(%)|null, 전부 획득, 스테이지 이름, 통솔력], ...]}
+    # 분류 파일을 한 번 읽어서 역색인 네 개를 같이 만든다:
+    # 이름 검색 {맵: [[스테이지, 이름], ...]} (스테이지 목록 검색할 때만 받음) / 적 → 등장 {적: [[맵, [스테이지...]], ...]} /
+    # 캐릭 → 드롭 스테이지 / 아이템(< 1000) → 드롭 스테이지 {아이템: [[맵, 스테이지, 확률|null, 전부 획득, 이름, 통솔력], ...]} (육성 페이지)
+    names_out: dict[int, list] = {}
+    appear: dict[int, dict[int, list[int]]] = {}
+    cat_drops: dict[int, list] = {}
     item_drops: dict[int, list] = {}
     for f in os.listdir(out_dir):
-        if f.endswith(".json") and f not in SKIP_FILES:
-            for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
-                for st in m["stages"]:
-                    for d in st.get("drop", []):
-                        if 0 <= d[0] < 1000:
-                            item_drops.setdefault(d[0], []).append(
-                                [int(mid), st["i"], d[2], st.get("dropAll", 0), st["n"], st.get("energy")])
-    with open(os.path.join(out_dir, "item_drops.json"), "w", encoding="utf-8") as f:
-        json.dump(item_drops, f, ensure_ascii=False, separators=(",", ":"))
+        if not f.endswith(".json") or f in SKIP_FILES:
+            continue
+        for mid, m in json.load(open(os.path.join(out_dir, f), encoding="utf-8")).items():
+            mid = int(mid)
+            names_out[mid] = [[st["i"], st["n"]] for st in m["stages"]]
+            for st in m["stages"]:
+                for e in st["en"]:
+                    lst = appear.setdefault(e[0], {}).setdefault(mid, [])
+                    if st["i"] not in lst:
+                        lst.append(st["i"])
+                for d in st.get("drop", []):
+                    if d[0] >= 1000 and d[0] in drop_chara:
+                        cat_drops.setdefault(drop_chara[d[0]], []).append([mid, st["i"], d[2], st.get("dropAll", 0), st["n"]])
+                    elif 0 <= d[0] < 1000:
+                        item_drops.setdefault(d[0], []).append([mid, st["i"], d[2], st.get("dropAll", 0), st["n"], st.get("energy")])
+    for name, obj, ascii_ in (("stage_names.json", names_out, False),
+                              ("enemy_stages.json", {eid: sorted(ms.items()) for eid, ms in appear.items()}, True),
+                              ("cat_drops.json", {k: sorted(v) for k, v in cat_drops.items()}, True),
+                              ("item_drops.json", item_drops, False)):
+        with open(os.path.join(out_dir, name), "w", encoding="utf-8") as fp:
+            json.dump(obj, fp, ensure_ascii=ascii_, separators=(",", ":"))
 
     items = {i: item_names[i] for i in sorted(used_items) if i < len(item_names)}
     with open(os.path.join(out_dir, "index.json"), "w", encoding="utf-8") as f:

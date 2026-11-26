@@ -364,8 +364,6 @@ def main(argv: list[str] | None = None) -> None:
             "desc": [" ".join(x.strip() for x in expl_rows[f][1:] if x.strip()) for f in range(len(forms))],
             "forms": [{**unit_form(stat_rows[f]), "anim": unit_anim(packs, cid, f)} for f in range(len(forms))],
             "curve": curves[cid] if cid < len(curves) else [],
-            "tf": evolve(ub, 27, 28, used_items) if len(forms) >= 3 else None,
-            "ff": evolve(ub, 38, 39, used_items) if len(forms) >= 4 else None,
             "talentDesc": talent_desc.get(cid, {}),
             "talentVals": talent_vals.get(cid, {}),
         }

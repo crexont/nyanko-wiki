@@ -379,8 +379,8 @@ function paint(root, c, u) {
       </div>
       <div>
         <div class="panel mine"><h2>내 보유 상태</h2>${mine}</div>
-        ${c.forms.length >= 3 ? evo("3진 진화", u.tf, c.tfLevel, "tf") : ""}
-        ${c.forms.length >= 4 ? evo("4진 진화", u.ff, c.ffLevel, "ff") : ""}
+        ${c.forms.length >= 3 ? evo("3진 진화", c.tfCost, c.tfLevel, "tf") : ""}
+        ${c.forms.length >= 4 ? evo("4진 진화", c.ffCost, c.ffLevel, "ff") : ""}
         ${levelPanel(c, o)}
         <div class="panel" id="getPanel"><h2>얻는 방법</h2><p class="note" style="margin:0">불러오는 중…</p></div>
         <div class="panel"><h2>기본 정보</h2><dl class="kv">
