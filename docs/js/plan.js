@@ -1,5 +1,5 @@
 // 육성 — 보유 재화·재료 + 진화 육성 계획 (필요 재료 합계·부족분)
-import { GD, BYID, FORM, esc, icon, store, view, itemName, itemIcon, have, haveXp, toast, orbInfo, ORB_GRADE, levelCost, clamp, getJson } from "./common.js";
+import { GD, BYID, FORM, esc, icon, store, view, itemName, itemIcon, have, haveXp, toast, orbInfo, ORB_GRADE, levelCost, clamp, getJson, entryCost, ITEM_COST, isDrinkMap } from "./common.js";
 
 const CURRENCY = [["xp", "경험치"], ["np", "NP"], ["catfood", "통조림"], ["normalTickets", "냥코 티켓"],
                   ["rareTickets", "레어 티켓"], ["platinumTickets", "플래티넘 티켓"], ["legendTickets", "레전드 티켓"]];
@@ -242,14 +242,16 @@ function renderDropList() {
   box.innerHTML = `<p class="note" style="margin:0">불러오는 중…</p>`;
   loadItemDrops().then(([drops, idx]) => {
     const where = new Map(idx.categories.flatMap(c => c.maps.map(([mid, n]) => [mid, { c: c.name, n }])));
+    // 같은 확률이면 통솔력 싼 순, 드링크·아이템 입장 스테이지는 그 뒤
+    const stamina = r => r.energy != null && r.energy < ITEM_COST && !isDrinkMap(r.mid) ? r.energy : Infinity;
     const list = (drops[dropSel] || []).map(([mid, si, ch, all, sname, energy]) => ({ mid, si, ch: all ? 100 : ch, all, sname, energy, ...where.get(mid) }))
-      .filter(r => r.n).sort((a, b) => (b.ch ?? 0) - (a.ch ?? 0) || (a.energy ?? 999) - (b.energy ?? 999));
+      .filter(r => r.n).sort((a, b) => (b.ch ?? 0) - (a.ch ?? 0) || stamina(a) - stamina(b));
     const fresh = list.filter(r => !r.n.includes("(옛 버전)"));
     const LIMIT = 40;
     box.innerHTML = `<h3 class="sum-title">${itemIcon(dropSel)}${esc(itemName(dropSel))} <small>${fresh.length}곳 · <a href="#/item/${dropSel}">통솔력 효율로 보기 ›</a></small></h3>
-      ${fresh.length ? `<div class="table-wrap"><table class="sum-table drop-table"><thead><tr><th>스테이지</th><th>확률</th><th>통솔력</th></tr></thead><tbody>
+      ${fresh.length ? `<div class="table-wrap"><table class="sum-table drop-table"><thead><tr><th>스테이지</th><th>확률</th><th>입장</th></tr></thead><tbody>
         ${fresh.slice(0, LIMIT).map(r => `<tr><td><small>${esc(r.c)}</small><a href="#/stage/${r.mid}/${r.si}">${esc(r.n)} · ${esc(r.sname)}</a></td>
-          <td>${r.all ? "확정" : r.ch != null ? `${r.ch}%` : "-"}</td><td>${r.energy ?? "-"}</td></tr>`).join("")}
+          <td>${r.all ? "확정" : r.ch != null ? `${r.ch}%` : "-"}</td><td>${r.energy == null ? "-" : esc(entryCost(r.energy, r.mid, itemName).replace(/^통솔력 /, ""))}</td></tr>`).join("")}
       </tbody></table></div>${fresh.length > LIMIT ? `<p class="note">확률 높은 ${LIMIT}곳만 보여줘요.</p>` : ""}`
       : `<p class="note" style="margin:0">이 재료를 드롭하는 스테이지를 찾지 못했어요.</p>`}
       <p class="note">이벤트·요일 스테이지는 열려 있는 기간에만 갈 수 있어요. 확률은 한 번 클리어했을 때 기준이에요.</p>`;

@@ -148,8 +148,13 @@ function route() {
   document.querySelectorAll(".nav a").forEach(a =>
     a.toggleAttribute("aria-current", NAV.find(n => n.href === a.getAttribute("href"))?.match.test(h)));
   document.querySelectorAll(".nav a[aria-current]").forEach(a => a.setAttribute("aria-current", "page"));
-  const t = main.querySelector("h1")?.textContent;
-  document.title = t && t !== "냥코위키" ? `${t} - 냥코위키` : "냥코위키";
+  // 상세 페이지는 데이터를 받은 뒤에 h1을 그리니, h1이 생길 때 탭 제목을 정한다
+  const setTitle = () => {
+    const t = page.querySelector("h1")?.textContent;
+    document.title = t && t !== "냥코위키" ? `${t} - 냥코위키` : "냥코위키";
+    return !!t;
+  };
+  if (!setTitle()) new MutationObserver((_, ob) => { if (setTitle()) ob.disconnect(); }).observe(page, { childList: true, subtree: true });
   window.scrollTo(0, 0);
 }
 
