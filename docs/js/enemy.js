@@ -1,21 +1,12 @@
 // 적 — 적 목록과 적 상세 (docs/data/enemies.json, 처음 열 때 한 번 받는다)
-import { GD, esc, clamp, traitChips, chips, toggle, store, FORM } from "./common.js";
+import { GD, esc, clamp, traitChips, chips, toggle, store, FORM, getJson, sec, num } from "./common.js";
 import { abilityText, loadUnits } from "./cat.js";
 
-let enemiesPromise;
-export const loadEnemies = () => enemiesPromise ??= fetch("data/enemies.json").then(r => {
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}).then(list => ({ list, byId: new Map(list.map(e => [e.id, e])) }));
+let enemies;  // 같은 목록이면 byId 지도를 다시 만들지 않는다
+export const loadEnemies = () => getJson("data/enemies.json")
+  .then(list => enemies?.list === list ? enemies : enemies = { list, byId: new Map(list.map(e => [e.id, e])) });
+const loadAppear = () => Promise.all([getJson("data/stages/enemy_stages.json"), getJson("data/stages/index.json")]);
 
-let appearPromise;
-const loadAppear = () => appearPromise ??= Promise.all([
-  fetch("data/stages/enemy_stages.json").then(r => r.json()),
-  fetch("data/stages/index.json").then(r => r.json()),
-]);
-
-const sec = frames => { const s = (frames / 30).toFixed(2).replace(/\.?0+$/, ""); return `${s}초`; };
-const num = n => Math.floor(n).toLocaleString();
 const f32 = Math.fround;
 // 냥코DB(battlecats-db.com) 적 번호 = 적 ID + 2
 export const dbEnemyUrl = id => `https://battlecats-db.com/enemy/${String(id + 2).padStart(3, "0")}.html`;

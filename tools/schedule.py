@@ -15,14 +15,13 @@ import argparse
 import datetime
 import json
 import os
-import re
 import sys
 import urllib.request
 
 from bcsfe import core
 from bcsfe.core.server.event_data import FilterData
 
-from common import ROOT, use_local_bcsfe_dir
+from common import ROOT, default_version, use_local_bcsfe_dir
 
 READER_FILE = os.path.join(ROOT, "schedule_reader.json")
 RAW_DIR = os.path.join(ROOT, "build", "schedule")
@@ -30,13 +29,6 @@ DEFAULT_OUT = os.path.join(ROOT, "docs", "data", "schedule.json")
 EVENTS_URL = "https://nyanko-events.ponosgames.com/battlecatskr_production/"
 FILES = ("sale", "gatya", "item")
 KST = datetime.timezone(datetime.timedelta(hours=9))
-
-
-def default_version() -> str:
-    """사이트 데이터(gamedata.js)를 만든 게임 버전."""
-    with open(os.path.join(ROOT, "docs", "gamedata.js"), encoding="utf-8") as f:
-        m = re.search(r'"builtFor":"([\d.]+)"', f.read())
-    return m.group(1) if m else "15.6.0"
 
 
 def empty_save(version: str) -> core.SaveFile:

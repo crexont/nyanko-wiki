@@ -15,7 +15,7 @@ import json
 import os
 import shutil
 
-from build_gamedata import DEFAULT_FILES, SITE, IconPacks, anim_len, game_data_dir, read
+from build_gamedata import DEFAULT_FILES, IconPacks, SITE, anim_len, cell, default_version, game_data_dir, read
 
 # 게임 데이터에 없는 적 아이콘 (나무위키 등에서 받아 둔 것): 간판 아가씨(#21) — 나무위키 "냥코 대전쟁 적 023"
 EXTRA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extra_icons", "enemy")
@@ -28,11 +28,6 @@ TRAIT_COLS = [(10, "빨강"), (13, "떠있음"), (14, "검정"), (15, "메탈"),
 FLAG_COLS = [(37, "immWave"), (38, "waveBlock"), (39, "immKb"), (40, "immFreeze"), (41, "immSlow"),
              (42, "immWeaken"), (70, "immWarp"), (85, "immSurge"), (103, "counterSurge"), (105, "immCurse"),
              (109, "immBlast")]
-
-
-def cell(r: list[str], c: int) -> int:
-    v = r[c].strip() if len(r) > c else ""
-    return int(v) if v.lstrip("-").isdigit() else 0
 
 
 def abilities(r: list[str]) -> list[list]:
@@ -95,7 +90,7 @@ def enemy_stats(r: list[str]) -> dict:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", default=DEFAULT_FILES)
-    ap.add_argument("--version", default="15.6.0")
+    ap.add_argument("--version", default=default_version())
     args = ap.parse_args(argv)
 
     G, _ = game_data_dir(args.version)

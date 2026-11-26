@@ -53,8 +53,16 @@ export const store = {
   changed() { this.listeners.forEach(fn => fn()); },
 };
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.cats) return d; } catch {}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.cats) { if (d.plan) d.plan = cleanPlan(d.plan); return d; } } catch {}
   return null;
+}
+// 육성 계획은 파일·저장소에서 오는 값이라 거른다 (to가 10억이면 레벨 비용 계산이 멈춤)
+function cleanPlan(list) {
+  return (Array.isArray(list) ? list : []).flatMap(p => {
+    const g = BYID.get(p?.id);
+    if (!g || !["tf", "ff", "lv"].includes(p.step)) return [];
+    return [p.step === "lv" ? { id: p.id, step: "lv", to: clamp(p.to | 0, 1, g.maxLevel) } : { id: p.id, step: p.step }];
+  });
 }
 
 // 세이브 JSON의 재화·재료 → inv. 추출 도구는 세이브 순서 그대로 내보내므로 gamedata의 순서표로 아이템 ID를 붙인다.
@@ -106,7 +114,7 @@ export async function importJson(text) {
                    plus: clamp(c.plus | 0, 0, g.maxPlus), talents: pickTalents(g, c.talents || {}) };
   }
   // 육성 계획·본능옥 선택은 세이브에 없는 내 입력이라, 파일에 없으면 지금 것을 유지
-  const plan = Array.isArray(d.plan) ? d.plan : (store.data?.plan || []);
+  const plan = Array.isArray(d.plan) ? cleanPlan(d.plan) : (store.data?.plan || []);
   const orbEquip = d.orbEquip || store.data?.orbEquip || {};
   store.data = { meta: { source: d.source || "불러온 파일", saveModified: d.saveModified, gameVersion: d.gameVersion,
                          catfood: d.catfood, importedAt: new Date().toISOString() }, cats, plan, orbEquip };
@@ -144,6 +152,27 @@ export function orbInfo(id) {
 }
 
 // ---- 재료·진화 판정 ----
+// 입장 비용 (통솔력 칸 값): 100000 이상이면 아이템 입장(아이템 × 1000 + 개수, 한탕 오락실 259100 = 전설의 돈다발 100개),
+// 드링크 스테이지(맵 앞자리 14)면 고양이 드링크(종류 × 1000 + 개수), 나머지는 통솔력
+export const ITEM_COST = 100000, DRINK_MAPS = 14;
+const DRINKS = ["고양이 드링크A", "고양이 드링크B", "고양이 드링크C"];
+export const isDrinkMap = mid => Math.floor(mid / 1000) === DRINK_MAPS;
+export function entryCost(e, mid, nameOf) {
+  if (e == null) return "통솔력 -";
+  if (e >= ITEM_COST) return `${nameOf(Math.floor(e / 1000))} ${e % 1000}개`;
+  if (isDrinkMap(mid)) return `${DRINKS[Math.floor(e / 1000)] ?? "드링크"} ${e % 1000}개`;
+  return `통솔력 ${e}`;
+}
+// JSON 한 번만 받기 (주소마다 공유). 실패하면 기억을 지워서 다음에 다시 받는다
+const jsonCache = new Map();
+export function getJson(url, init) {
+  if (!jsonCache.has(url)) jsonCache.set(url, fetch(url, init).then(r => { if (!r.ok) throw new Error(`${url} ${r.status}`); return r.json(); })
+    .catch(e => { jsonCache.delete(url); throw e; }));
+  return jsonCache.get(url);
+}
+// 프레임(30fps) → "1.5초", 숫자 → 버림 후 천 단위 쉼표
+export const sec = f => `${(f / 30).toFixed(2).replace(/\.?0+$/, "")}초`;
+export const num = n => Math.floor(n).toLocaleString();
 export const itemName = id => GD.items?.[id] ?? `아이템 ${id}`;
 // 아이템 아이콘 (docs/icons/items/<아이템 ID>.png). 이름은 마우스를 올리면 보인다
 export const itemIcon = (id, name = itemName(id)) =>

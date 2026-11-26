@@ -1,12 +1,12 @@
 // 캐릭터 — 전체 캐릭 목록
-import { GD, esc, icon, rarBadge, store, chips, toggle } from "./common.js";
+import { GD, esc, icon, rarBadge, store, chips, toggle, getJson } from "./common.js";
 
 const ui = { q: "", rar: new Set(), trait: new Set(), get: new Set(), sort: "id" };
 
 // 얻는 방법 (gamedata cats[].get + 스테이지 드롭 목록 cat_drops.json). 캐릭 하나가 여러 개에 해당할 수 있다
 const GET = [["basic", "기본 캐릭"], ["rare", "레어 뽑기"], ["normal", "냥코 뽑기"], ["gacha", "기타 뽑기"], ["drop", "스테이지 드롭"], ["etc", "기타(이벤트·미션 등)"]];
 let drops = null;
-fetch("data/stages/cat_drops.json").then(r => r.json()).then(d => { drops = new Set(Object.keys(d).map(Number)); })
+getJson("data/stages/cat_drops.json").then(d => { drops = new Set(Object.keys(d).map(Number)); })
   .catch(() => { drops = new Set(); }).finally(() => renderList());
 function getKinds(c) {
   const g = c.get || {}, out = [];

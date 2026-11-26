@@ -1,15 +1,14 @@
 // 일정 — 게임 서버 이벤트 데이터(스테이지·뽑기·아이템). tools/schedule.py 가 만든 JSON을
 // GitHub Actions가 schedule-data 브랜치에 올리고, 사이트는 그걸 읽는다 (로컬 미리보기는 data/schedule.json).
 // 화면: 오늘(남은 시간·오늘 시간표·곧 시작) / 달력 / 목록. 내 도감이 있으면 없는 캐릭을 얻을 수 있는 일정을 표시한다.
-import { GD, BYID, esc, icon, store } from "./common.js";
+import { GD, BYID, esc, icon, store, getJson } from "./common.js";
 import { loadIndex } from "./stage.js";
 
 const LOCAL = /^(localhost|127\.|\[::1\])/.test(location.hostname);
 const SRC = LOCAL ? "data/schedule.json" : "https://raw.githubusercontent.com/crexont/nyanko-wiki/schedule-data/schedule.json";
-let dataPromise, setsPromise, dropsPromise;
-export const loadSchedule = () => dataPromise ??= fetch(SRC, { cache: "no-cache" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
-const loadSets = () => setsPromise ??= fetch("data/gatya_sets.json").then(r => r.json());
-const loadDrops = () => dropsPromise ??= fetch("data/stages/cat_drops.json").then(r => r.json());
+export const loadSchedule = () => getJson(SRC, { cache: "no-cache" });
+const loadSets = () => getJson("data/gatya_sets.json");
+const loadDrops = () => getJson("data/stages/cat_drops.json");
 
 const DAY = 864e5;
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];  // 요일 비트: 1 = 일요일 … 64 = 토요일

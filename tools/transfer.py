@@ -17,13 +17,12 @@ import argparse
 import datetime
 import json
 import os
-import re
 import sys
 
 from bcsfe import core
 
 import export_save
-from common import FROZEN, ROOT, use_local_bcsfe_dir
+from common import FROZEN, ROOT, default_version, use_local_bcsfe_dir
 
 SAVE_URL = "https://nyanko-save.ponosgames.com"
 BACKUP_DIR = os.path.join(ROOT, "build", "transfer")
@@ -31,15 +30,6 @@ OUT = os.path.join(ROOT, "냥코_세이브.json")
 CODES_TXT = os.path.join(ROOT, "이어하기_코드.txt")
 UA = "Dalvik/2.1.0 (Linux; U; Android 9; SM-G955F Build/N2G48B)"
 KR = core.CountryCode.from_code("kr")
-
-
-def default_version() -> str:
-    try:
-        with open(os.path.join(ROOT, "docs", "gamedata.js"), encoding="utf-8") as f:
-            m = re.search(r'"builtFor":"([\d.]+)"', f.read())
-        return m.group(1) if m else "15.7.0"
-    except OSError:
-        return "15.7.0"
 
 
 def compact(obj) -> str:
@@ -160,7 +150,7 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         code, pin = reupload(raw, password)
-    except RuntimeError as e:
+    except Exception as e:  # 연결 끊김·응답 깨짐도 재시도 안내가 나와야 한다
         print(f"\n{e}. 아래 명령으로 다시 시도해 주세요 (세이브는 백업에 그대로 있어요):")
         print(f'  NyankoWiki.exe --retry "{backup}"' if FROZEN else f'  python tools/transfer.py --retry "{backup}"')
         sys.exit(1)

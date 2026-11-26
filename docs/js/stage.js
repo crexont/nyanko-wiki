@@ -1,15 +1,10 @@
 // 스테이지 — 분류·맵 목록, 맵(스테이지 목록), 스테이지 상세(출현 적·드롭, 내 캐릭 사거리 비교)
-import { GD, BYID, esc, store, traitChips, itemIcon } from "./common.js";
+import { GD, BYID, esc, store, traitChips, itemIcon, ITEM_COST, isDrinkMap, entryCost, getJson, sec, num } from "./common.js";
 import { loadEnemies, enemyIcon, enemyHp, enemyAtk, enemyCycle } from "./enemy.js";
 
-let indexPromise;
-const catPromises = {};
-export const loadIndex = () => indexPromise ??= fetch("data/stages/index.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
-let namesPromise;
-const loadNames = () => namesPromise ??= fetch("data/stages/stage_names.json").then(r => r.json());
-const loadCat = code => catPromises[code] ??= fetch(`data/stages/${code}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
-let unitsPromise;
-const loadUnits = () => unitsPromise ??= fetch("data/units.json").then(r => r.json());
+export const loadIndex = () => getJson("data/stages/index.json");
+const loadNames = () => getJson("data/stages/stage_names.json");
+const loadCat = code => getJson(`data/stages/${code}.json`);
 
 // 맵 번호 앞자리 → 분류 코드 (build_stages.py CATEGORIES 와 같다)
 const PREFIX = { 3: "MS", 20: "Z", 21: "Z", 22: "Z", 23: "Z", 0: "N", 13: "NA", 34: "ND", 1: "S", 2: "C", 24: "A", 27: "CA", 25: "H", 31: "Q", 4: "RE", 14: "B",
@@ -18,8 +13,6 @@ const codeOf = mid => PREFIX[Math.floor(mid / 1000)];
 // 900초(27000F) 이상 기다렸다 나오는 적 (간판 아가씨 등 시간 끌기 방지용): 출현 적 표엔 남기고
 // 사거리 비교·아웃레인지·가장 긴 적 사거리·속성 대응 계산에서는 뺀다
 const LATE_F = 27000;
-const sec = f => { const s = (f / 30).toFixed(2).replace(/\.?0+$/, ""); return `${s}초`; };
-const num = n => Math.floor(n).toLocaleString();
 const failed = (root, what) => { root.innerHTML = `<div class="empty">${what} 데이터를 불러오지 못했어요. 새로고침해 주세요.</div>`; };
 // 냥코DB(일본판) 스테이지 주소: s{맵번호÷1000 (2자리)}{맵번호%1000 (3자리)}-{스테이지+1 (2자리)}.
 // 좀비 습격은 메인 스토리 번호 + z (미래편 1장 = 03003z). 세계편·세계편 좀비는 한국판 전용 지도라 없다.
@@ -35,9 +28,7 @@ function dbStageUrl(mid, si) {
   return `https://battlecats-db.com/stage/s${map}-${String(si + 1).padStart(2, "0")}.html`;
 }
 const itemName = (idx, id) => idx.items[id] ?? GD.items?.[id] ?? `아이템 ${id}`;
-// 입장 비용: 통솔력, 또는 아이템으로 들어가는 스테이지 (통솔력 칸 = 아이템 번호 × 1000 + 개수, 한탕 오락실 259100 = 전설의 돈다발 100개)
-const ITEM_COST = 100000;
-const costText = (idx, e) => e == null ? "통솔력 -" : e >= ITEM_COST ? `${itemName(idx, Math.floor(e / 1000))} ${e % 1000}개` : `통솔력 ${e}`;
+const costText = (idx, e, mid) => entryCost(e, mid, id => itemName(idx, id));
 
 // 드롭 보상 한 칸: 아이템(번호 < 1000) 또는 캐릭(1000 이상: 번호 − 1000 / 10000 이상: 번호 − 10000)
 function rewardHtml(idx, [id, amount, chance], all) {
@@ -122,7 +113,7 @@ export function renderMap(root, mid) {
         return `<a class="stage-row" href="#/stage/${mid}/${s.i}">
           <span class="no">${s.i + 1}</span>
           <span class="body"><b>${esc(s.n)}</b>
-            <small>${esc(costText(idx, s.energy))} · 성 체력 ${s.time ? "무한" : num(s.hp)}${boss.length ? ` · 보스 ${boss.map(e => esc(e?.name ?? "?")).join(", ")}` : ""}</small></span>
+            <small>${esc(costText(idx, s.energy, mid))} · 성 체력 ${s.time ? "무한" : num(s.hp)}${boss.length ? ` · 보스 ${boss.map(e => esc(e?.name ?? "?")).join(", ")}` : ""}</small></span>
           <span class="ens">${show.map(e => enemyIcon(e, "sm")).join("")}</span></a>`;
       }).join("")}</div>`;
     document.title = `${m.n} - 냥코위키`;
@@ -194,7 +185,7 @@ function paint(root, idx, mid, m, s, byId) {
       </div>
       <div>
         <div class="panel"><h2>스테이지 정보</h2><dl class="kv">
-          <dt>${s.energy >= ITEM_COST ? "입장" : "통솔력"}</dt><dd>${s.energy >= ITEM_COST ? esc(costText(idx, s.energy).replace(/^통솔력 /, "")) : s.energy ?? "-"}</dd>
+          <dt>${s.energy >= ITEM_COST || isDrinkMap(mid) ? "입장" : "통솔력"}</dt><dd>${esc(costText(idx, s.energy, mid).replace(/^통솔력 /, ""))}</dd>
           ${s.xp ? `<dt>경험치</dt><dd>${num(s.xp)}</dd>` : ""}
           <dt>성 체력</dt><dd>${s.time ? "무한 (시간 제한)" : num(s.hp)}</dd>
           <dt>스테이지 길이</dt><dd>${num(s.w)}</dd>
@@ -228,7 +219,7 @@ function paintMine(root, rows, enemies, traits) {
       <p class="note">내 도감에 캐릭을 넣으면, 이 적들보다 사거리가 긴 내 캐릭을 같이 보여줘요. <a href="#/dex">내 도감</a></p>`;
     return;
   }
-  loadUnits().then(units => {
+  getJson("data/units.json").then(units => {
     const mine = owned.map(([c, o]) => {
       const fi = Math.min(o.form, c.forms.length - 1), f = units[c.id]?.forms[fi];
       return f ? { c, fi, name: c.forms[fi].name, r: f.range, ab: f.ab, traits: c.forms[fi].traits } : null;

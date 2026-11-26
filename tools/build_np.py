@@ -17,7 +17,7 @@ import collections
 import json
 import os
 
-from build_gamedata import SITE, game_data_dir, read
+from build_gamedata import SITE, default_version, game_data_dir, read
 from build_stages import CATEGORIES, SKIP_FILES, data_lines, ints, parse_reward
 
 ORB = 30000          # 보상 아이템 번호 - ORB = 본능옥 번호
@@ -210,7 +210,7 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--version", default="15.6.0")
+    ap.add_argument("--version", default=default_version())
     args = ap.parse_args(argv)
     G, _ = game_data_dir(args.version)
     D = os.path.join(G, "DataLocal")

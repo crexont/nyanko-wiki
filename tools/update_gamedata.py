@@ -22,6 +22,7 @@ import build_gatya_sets
 import build_items
 import build_np
 import build_stages
+import check_values
 import extract_vhdx
 import unpack_gamedata
 from common import ROOT, use_local_bcsfe_dir
@@ -96,6 +97,7 @@ def main(argv: list[str] | None = None) -> None:
     build_np.main(v)
     build_items.main(v)
     summary(before, snapshot())
+    check_values.main()
 
 
 if __name__ == "__main__":

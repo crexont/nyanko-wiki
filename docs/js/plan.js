@@ -1,5 +1,5 @@
 // 육성 — 보유 재화·재료 + 진화 육성 계획 (필요 재료 합계·부족분)
-import { GD, BYID, FORM, esc, icon, store, view, itemName, itemIcon, have, haveXp, toast, orbInfo, ORB_GRADE, levelCost, clamp } from "./common.js";
+import { GD, BYID, FORM, esc, icon, store, view, itemName, itemIcon, have, haveXp, toast, orbInfo, ORB_GRADE, levelCost, clamp, getJson } from "./common.js";
 
 const CURRENCY = [["xp", "경험치"], ["np", "NP"], ["catfood", "통조림"], ["normalTickets", "냥코 티켓"],
                   ["rareTickets", "레어 티켓"], ["platinumTickets", "플래티넘 티켓"], ["legendTickets", "레전드 티켓"]];
@@ -228,11 +228,8 @@ function renderPlanParts() {
 const costText = cost => cost ? `<span class="cost-ic">${cost.xp ? `<b>${itemIcon(GD.currencyItems.xp, "경험치")}${cost.xp.toLocaleString()}</b>` : ""}${cost.items.map(([id, n]) => `<b>${itemIcon(id)}×${n}</b>`).join("")}</span>` : "";
 
 // ---- 재료 드롭 스테이지 (docs/data/stages/item_drops.json) ----
-let dropSel = null, dropsPromise;
-const loadItemDrops = () => dropsPromise ??= Promise.all([
-  fetch("data/stages/item_drops.json").then(r => r.json()),
-  fetch("data/stages/index.json").then(r => r.json()),
-]);
+let dropSel = null;
+const loadItemDrops = () => Promise.all([getJson("data/stages/item_drops.json"), getJson("data/stages/index.json")]);
 const materialIds = () => itemGroups().flatMap(([, ids]) => ids);
 
 function renderDropPick() {

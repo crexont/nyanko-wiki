@@ -11,12 +11,12 @@ import argparse
 import json
 import os
 
-from build_gamedata import SITE, game_data_dir, read
+from build_gamedata import SITE, default_version, game_data_dir, read
 
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--version", default="15.6.0")
+    ap.add_argument("--version", default=default_version())
     args = ap.parse_args(argv)
     G, _ = game_data_dir(args.version)
     sets = []

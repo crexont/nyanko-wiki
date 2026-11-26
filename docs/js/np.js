@@ -1,11 +1,10 @@
 // NP효율 — NP를 얻는 방법(뽑기·강습·지도·티켓 스테이지)마다 통솔력·리더쉽·통조림 하나당 NP를 비교한다.
 // 게임 데이터 값은 tools/build_np.py 가 만든 data/np.json, 뽑기 확률은 일정 데이터(서버 이벤트)에서.
-import { esc, BYID } from "./common.js";
+import { esc, BYID, getJson } from "./common.js";
 import { loadSchedule, openNow } from "./schedule.js";
 import { loadItems, stageRule, kinds, kindChips, bindKindChips, kindTag } from "./items.js";
 
-let npPromise;
-const loadNp = () => npPromise ??= fetch("data/np.json").then(r => r.json());
+const loadNp = () => getJson("data/np.json");
 
 // 환산 기준 (이 브라우저에 저장)
 const KEY = "nyanko-wiki.np";

@@ -17,7 +17,7 @@ import json
 import os
 import re
 
-from build_gamedata import DEFAULT_FILES, SITE, IconPacks, game_data_dir, read
+from build_gamedata import DEFAULT_FILES, IconPacks, SITE, default_version, game_data_dir, read
 
 # (사이트 코드, 분류 이름, 맵 번호 앞자리, 스테이지 파일 코드, 이름 파일 코드, MapStageData 코드)
 CATEGORIES = [
@@ -234,7 +234,7 @@ def build_main(D: str, R: str, map_names: dict, specs: list) -> tuple[dict, list
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", default=DEFAULT_FILES)
-    ap.add_argument("--version", default="15.6.0")
+    ap.add_argument("--version", default=default_version())
     args = ap.parse_args(argv)
 
     G, _ = game_data_dir(args.version)

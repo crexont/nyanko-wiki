@@ -60,7 +60,9 @@ def main() -> None:
         if not os.path.isfile(os.path.join(args.sevenzip, f)):
             sys.exit(f"7-Zip 파일 없음: {os.path.join(args.sevenzip, f)}")
 
-    shutil.rmtree(BUILD, ignore_errors=True)
+    # build/transfer(이어하기 백업)·build/schedule 은 남긴다
+    for sub in ("dist", "work"):
+        shutil.rmtree(os.path.join(BUILD, sub), ignore_errors=True)
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--onedir", "--console",
                     "--name", NAME, "--collect-all", "bcsfe",
                     "--paths", os.path.join(ROOT, "tools"),

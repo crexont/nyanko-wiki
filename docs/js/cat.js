@@ -1,20 +1,12 @@
 // 캐릭터 상세 — 진화 단계별 스탯·능력·본능·진화 재료 + 내 보유 상태
-import { GD, BYID, FORM, esc, clamp, icon, rarBadge, traitChips, view, store, itemName, itemIcon, have, haveXp, ORB_GRADE, levelCost } from "./common.js";
+import { GD, BYID, FORM, esc, clamp, icon, rarBadge, traitChips, view, store, itemName, itemIcon, have, haveXp, ORB_GRADE, levelCost, getJson, sec, num } from "./common.js";
 import { openEdit } from "./edit.js";
 import { addToPlan, removeFromPlan, inPlan } from "./plan.js";
 
-let unitsPromise;
-export const loadUnits = () => unitsPromise ??= fetch("data/units.json").then(r => {
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-});
+export const loadUnits = () => getJson("data/units.json");
 
 const state = { id: null, form: null, level: null, plus: null, tal: null, orbs: null, to: null };
-let dropsPromise;
-const loadDrops = () => dropsPromise ??= Promise.all([
-  fetch("data/stages/cat_drops.json").then(r => r.json()),
-  fetch("data/stages/index.json").then(r => r.json()),
-]);
+const loadDrops = () => Promise.all([getJson("data/stages/cat_drops.json"), getJson("data/stages/index.json")]);
 
 export function renderCat(root, id) {
   const c = BYID.get(id);
@@ -27,8 +19,6 @@ export function renderCat(root, id) {
   return draw;
 }
 
-const sec = frames => { const s = (frames / 30).toFixed(2).replace(/\.?0+$/, ""); return `${s}초`; };
-const num = n => Math.floor(n).toLocaleString();
 const STEP_NAME = { tf: "3진", ff: "4진" };
 
 // 레벨 배율: 레벨이 1 오를 때마다 기본값의 curve[(레벨)/10]% 만큼 오른다 (unitlevel.csv)

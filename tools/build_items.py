@@ -24,9 +24,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 
-from build_gamedata import SITE, game_data_dir, read
+from build_gamedata import SITE, default_version, game_data_dir, read
 from build_np import repeat_drops, stage_files
 
 STAGES = os.path.join(SITE, "data", "stages")
@@ -34,12 +33,6 @@ MAX_ITEM = 1000  # 1000 이상은 캐릭 드롭, 30000 이상은 본능옥
 XP_DROP = 6      # 아이템 6 = XP (개수 = XP 양)
 XP_ONLY = 300    # 드롭 없이 클리어 XP만 주는 스테이지는 효율 좋은 것만 넣는다
 ITEM_COST = 100000
-
-
-def built_for() -> str:
-    with open(os.path.join(SITE, "gamedata.js"), encoding="utf-8") as f:
-        m = re.search(r'"builtFor":"([\d.]+)"', f.read())
-    return m.group(1) if m else "15.6.0"
 
 
 def map_options(version: str) -> dict[int, list[int]]:
@@ -61,7 +54,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", default=None, help="게임 버전 (기본: gamedata.js builtFor)")
     args = ap.parse_args(argv)
-    opts = map_options(args.version or built_for())
+    opts = map_options(args.version or default_version())
 
     idx = json.load(open(os.path.join(STAGES, "index.json"), encoding="utf-8"))
     names = {int(k): v for k, v in idx["items"].items()}

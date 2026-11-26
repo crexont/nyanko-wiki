@@ -1,16 +1,12 @@
 // 아이템 — 스테이지 드롭으로 얻는 아이템 목록(#/items)과 아이템별 드롭 스테이지 효율(#/item/<id>).
 // 데이터: tools/build_items.py → data/items.json (반복 클리어 1번 기대 개수·첫 클리어 보상·통솔력 칸 값·스테이지 이름)
 // NP효율(#/np)도 이 메뉴 안에 있다.
-import { esc, have, store } from "./common.js";
+import { esc, have, store, ITEM_COST, isDrinkMap, entryCost, getJson } from "./common.js";
 import { loadIndex } from "./stage.js";
 import { loadSchedule, openNow } from "./schedule.js";
 
-let itemsPromise;
-export const loadItems = () => itemsPromise ??= fetch("data/items.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+export const loadItems = () => getJson("data/items.json");
 
-const ITEM_COST = 100000;  // 통솔력 칸이 이 이상이면 아이템 입장 (아이템 × 1000 + 개수)
-const DRINK_MAPS = 14;     // 맵 번호 앞자리 14 = 고양이 드링크 스테이지: 통솔력 칸이 드링크 (종류 × 1000 + 개수)
-const DRINKS = ["고양이 드링크A", "고양이 드링크B", "고양이 드링크C"];
 // 데이터에 1회 표시가 없지만 스테이지(층·단)마다 한 번만 받는 분류: 풍운 냥코탑(열릴 때마다 초기화)·냥코도 승단 시험 (사용자 확인)
 const ONCE_MAPS = new Set([7, 37]);
 const MAP_ITEM = 25;       // 맵 번호 앞자리 25 = 고전장: 지도 아이템을 써서 여는 맵
@@ -132,13 +128,7 @@ function statusHtml(r) {
 }
 const canGo = r => r.s?.open || r.always;
 
-function costText(d, idx, r) {
-  const e = r.energy;
-  if (e == null) return "-";
-  if (e >= ITEM_COST) return `${idx.items?.[Math.floor(e / 1000)] ?? d.names[Math.floor(e / 1000)] ?? "아이템"} ${e % 1000}개`;
-  if (r.drink) return `${DRINKS[Math.floor(e / 1000)] ?? "드링크"} ${e % 1000}개`;
-  return `통솔력 ${e}`;
-}
+const costText = (d, idx, r) => r.energy == null ? "-" : entryCost(r.energy, r.mid, n => idx.items?.[n] ?? d.names[n] ?? "아이템");
 
 export function renderItem(root, id) {
   root.innerHTML = `<div class="empty">불러오는 중…</div>`;
@@ -157,7 +147,7 @@ export function renderItem(root, id) {
     for (const [mid, si, per, once, energy, sname, top = 0, clear = 0, single = 0, topAll = 0] of list) {
       const w = where.get(mid);
       if (!w) continue;
-      const pre = Math.floor(mid / 1000), drink = pre === DRINK_MAPS;
+      const pre = Math.floor(mid / 1000), drink = isDrinkMap(mid);
       const paid = energy > 0 && energy < ITEM_COST && !drink;  // 통솔력으로 들어가는 스테이지
       const rule = stageRule(d, mid, si), reset = rule.reset;
       const base = { mid, si, energy, sname, drink, reset, paid, wait: rule.wait, c: w.c, n: w.n, s: status.get(mid), always: ALWAYS.has(pre),

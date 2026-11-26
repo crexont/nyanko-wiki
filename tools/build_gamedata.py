@@ -21,7 +21,7 @@ import shutil
 
 from Crypto.Cipher import AES
 
-from common import ROOT, use_local_bcsfe_dir
+from common import ROOT, default_version, use_local_bcsfe_dir
 
 DEFAULT_FILES = os.path.join(ROOT, "device")
 SITE = os.path.join(ROOT, "docs")
@@ -240,7 +240,7 @@ def evolve(ub: list[int], xp_col: int, items_col: int, used: set[int]) -> dict |
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", default=DEFAULT_FILES)
-    ap.add_argument("--version", default="15.6.0")
+    ap.add_argument("--version", default=default_version())
     args = ap.parse_args(argv)
 
     G, data_version = game_data_dir(args.version)
