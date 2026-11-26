@@ -89,7 +89,7 @@ def ex_info(D: str, code: str, mid: int, si: int) -> tuple[int, int, list] | Non
 
     stage<코드><맵>_<스테이지>.csv 첫 줄 = 성 번호, 이어하기 불가, EX 확률, EX 맵(엑스트라 RE 번호), EX 스테이지 처음, 끝
     (팩맨 콜라보: 1·2·3·4·5·7·10%, EX 맵 81 = 보너스 스테이지, 파워 쿠키 10개 확정).
-    나무위키는 팩맨 EX를 "각 10% 확률로 등장"이라고 적어서, 사이트에서 확률을 바꿀 수 있게 한다.
+    나무위키 "각 10%"는 일본판 값 (한국판은 위 데이터 값). 사이트에서 줄마다 바꿀 수 있다.
     """
     cat = next((c for c in CATEGORIES if c[0] == code), None)
     if not cat:

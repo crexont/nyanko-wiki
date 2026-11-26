@@ -34,9 +34,8 @@ const catTicketNp = rareNp => { const g = CAT_GATYA[opt.catPlus]; return (opt.np
 const XP_NP = 0.45;
 const xpNp = xp => opt.npXp ? (xp || 0) / 1e6 * XP_NP : 0;
 let XP_ITEMS = {};
-// EX 출현율: 맵마다 직접 정할 수 있음 (비우면 게임 데이터 값). 팩맨은 나무위키·커뮤니티가 "각 10%"라고 해서 기본 10%
-const EX_DEFAULT = { 2271: 10 };
-const exPctOf = s => opt.exMap[s.map] ?? EX_DEFAULT[s.map] ?? s.ex.p;
+// EX 출현율: 맵마다 직접 정할 수 있음 (비우면 게임 데이터 값). 팩맨 "각 10%"는 일본판 값, 한국판은 데이터대로 1~10%
+const exPctOf = s => opt.exMap[s.map] ?? s.ex.p;
 const exProb = s => exPctOf(s) / 100;
 // 한 번 클리어할 때 티켓 기대값 (EX 포함)
 const stageTickets = (s, tid) => (s.t[tid] || 0) + (s.ex?.t[tid] ? exProb(s) * s.ex.t[tid] : 0);  // 뽑기에서 나오는 XP 아이템 → XP 양 (np.json)
@@ -328,7 +327,7 @@ const EVENT_RATES = {
   260: [10, 10], 196: [10, 10],  // 전설의 벌레 채집망 (여름 방학)
   216: [10, 10], 204: [10, 10],  // 전설의 트랩 (여름 방학 서바이벌)
   259: [8, 50],   // 전설의 돈다발 (여름 방학 파라다이스, 50회마다)
-  267: [5, 10],   // 파워 쿠키 (팩맨): 커뮤니티 영상 수치(통솔력 400당 2.71NP, 1스테·EX 10%)를 거꾸로 계산한 값
+  267: [5, 10],   // 파워 쿠키 (팩맨): 2026-11-26 서버 일정 데이터로 확인 (세트 52, 한정 5%)
 };
 const RADAR = 1;  // 트레저 레이더 (Gatyaitembuy 1)
 // 트레저 레이더 1개 = 1.6NP: 역습의 대갈이군(2장 70% / 3장 30%)에 쓰면 3장 확정 → 냥코 티켓 0.7장 이득 (커뮤니티 값, 사용자 결정)
@@ -427,7 +426,7 @@ function ticketPanel(d, tg) {
       const st = stagesOf(tid);
       const spec = t.set.special.map(([, n, name]) => `${name} ${n}개`).join(", ");
       return `<tr${t.open ? ` class="boss"` : ""}>
-        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (${TICKET_NOTE[tid]?.[0] === "est" ? "추정: 영상 수치 역산" : "나무위키"})` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
+        <td class="en-name">${esc(t.name)}${t.open ? ` <span class="sc-open">지금 열림</span>` : ""}<br><small>${t.est ? (t.chars.length ? `확률 추정 (한정 캐릭 ${opt.eventChar}%)` : "지금 일정에 없음") : t.known ? `한정 캐릭터 ${t.rates[3][0] / 100}% (${TICKET_NOTE[tid]?.[2] ?? (TICKET_NOTE[tid]?.[0] === "est" ? "추정: 영상 수치 역산" : "나무위키")})` : grades}${t.chars.length && t.kind === "collab" ? (t.every ? ` · ${t.every}회마다 한정 캐릭 확정` : " · 한정 캐릭 확정 없음") : ""}${t.start && !t.open ? ` · ${t.start.slice(5, 10).replace("-", "/")} 시작` : ""}</small></td>
         <td data-l="1장 NP"><b>${t.np == null ? "-" : n2(t.np)}</b>${t.manual ? `<br><small>자동 ${t.auto == null ? "-" : n2(t.auto)}</small>` : ""}</td>
         <td data-l="직접 입력"><input class="np-tin" type="number" min="0" step="0.01" data-tnp="${tid}" value="${t.manual ? opt.tNp[tid] : ""}" placeholder="자동"></td>
         <td data-l="나오는 캐릭"><small>${chars.length ? esc(chars.join(", ")) : "캐릭 없음 (아이템·XP만)"}${betText(d, tid)}${spec ? `<br>특별 아이템 (이벤트마다 최대, 30회마다 확정): ${esc(spec)}` : ""}</small></td>
@@ -466,7 +465,7 @@ const BASIS_STATUS = {
 };
 // 이벤트 뽑기 티켓별 메모 (출처 충돌·추정 근거)
 const TICKET_NOTE = {
-  267: ["est", "공개된 확률 없음. 커뮤니티 영상 수치(1스테·EX 10% 기준 통솔력 400당 2.71NP)를 거꾸로 계산한 값 (캐릭 2종 × 2.5%). game8 경험담(거의 확정 틀에서만 나옴)과도 맞음"],
+  267: ["ok", "2026-11-26 팩맨 콜라보 서버 일정 데이터: 노멀 13% · 대박 50% · 초 대박 30% · 한정 캐릭터 5% (캐릭 2종) · 레전드 칸 2% (특별 아이템). 전에 영상 수치로 거꾸로 계산한 5%와 같음", "서버 데이터 2026-11"],
   163: ["est", "일본 위키(seesaawiki): 캐릭 각 2.5% (일본판 4종 = 10%). 한국판 최신 세트는 3종"],
   215: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
   178: ["est", "확률을 적어 둔 곳 없음 (10회 확정만 game8에서 확인)"],
@@ -486,7 +485,7 @@ function basisHtml(d, tg, rareRaw) {
     ["럭키·이벤트", "이벤트 뽑기 확정 틀", "대부분 10회마다 한정 캐릭 1개 (고양이 농가 제외)", "나무위키 이벤트 뽑기 문서, game8", "ok"],
     ["럭키·이벤트", "30회 특별 아이템 (레어 티켓·플래티넘 조각 등)", "NP에 안 넣음", "이벤트마다 개수 제한이 있어서 (사용자 결정)", "set"],
     ["스테이지", "스테이지 드롭 확률", "스테이지마다", "게임 데이터, 나무위키 시즌·발굴·육성 스테이지 문서와 대조해 일치", "ok"],
-    ["스테이지", "EX 스테이지 출현율", "게임 데이터 값 (팩맨만 10%, 줄마다 바꿀 수 있음)", "게임 데이터 (스테이지 파일 \"EX出現率\"). 나무위키·game8은 팩맨 \"약 10%\"", "clash"],
+    ["스테이지", "EX 스테이지 출현율", "게임 데이터 값 (줄마다 바꿀 수 있음)", "게임 데이터 (스테이지 파일 \"EX出現率\"). 팩맨 \"각 10%\"(나무위키·game8)는 일본판 값, 한국판은 1·2·3·4·5·7·10%", "ok"],
     ["스테이지", "한탕 오락실", "10→11.7 · 30→32.5 · 100→125장", "게임 데이터, 나무위키와 일치", "ok"],
     ["스테이지", "역습의 대갈이군 · 대역습의 메타쿠마", "열릴 때마다 1번만", "나무위키 육성 스테이지 문서 · 사용자 확인 (데이터 플래그로는 구분 안 됨)", "ok"],
     ["본능옥·강습", "본능옥 분해 NP", `D ${d.gradeNp[0]} · C ${d.gradeNp[1]} · B ${d.gradeNp[2]} · A ${d.gradeNp[3]} · S ${d.gradeNp[4]}`, "게임 데이터 (equipmentgrade)", "ok"],
@@ -522,7 +521,7 @@ function basisHtml(d, tg, rareRaw) {
       <li>본능옥을 NP로 바꾸면 D ${d.gradeNp[0]}, C ${d.gradeNp[1]}, B ${d.gradeNp[2]}, A ${d.gradeNp[3]}, S ${d.gradeNp[4]} NP. 합성하지 않고 바로 바꾼다고 봐요.</li>
       <li>강습은 클리어하면 EX 스테이지(기원·정점·비경)가 나올 수 있고, EX에서 본능옥이 나와요. EX 1회 NP 기대값: 기원 ${n2(d.exNp[0])}, 정점 ${n2(d.exNp[1])}, 비경 ${n2(d.exNp[2])}. EX 스테이지 통솔력은 넣지 않았어요.</li>
       <li>이벤트·럭키 티켓은 그 티켓 뽑기에서 나오는 캐릭을 전부 중복으로 보고 NP로 바꾼다고 계산해요 (XP·전투 아이템은 NP 0). 뽑기 구성은 게임 데이터, 확률은 일정 데이터(서버)에서 가져와요.
-        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (게임 데이터 확률, 팩맨은 10%. 순위표의 그 스테이지 줄에서 바꿀 수 있어요). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
+        지금 일정에 없는 이벤트 뽑기는 확률을 알 수 없어서 한정 캐릭 확률(기본 ${opt.eventChar}%)을 직접 넣은 값으로 추정해요. 스테이지를 깬 뒤 나오는 EX 스테이지(통솔력 0, 팩맨 파워 쿠키 10장 등)도 출현 확률만큼 더해요 (게임 데이터 확률. 순위표의 그 스테이지 줄에서 바꿀 수 있어요). 10번마다 한정 캐릭 하나가 확정으로 나오는 것도 넣었어요 (10번 중 9번은 확률대로, 1번은 확정). 30회마다 나오는 특별 아이템은 개수 제한이 있어서 넣지 않았어요.</li>
       <li>지도·보물이 잠든 섬 스테이지는 지도 아이템이나 이벤트가 있을 때만 할 수 있어요.</li>
     </ul></div>`;
 }
