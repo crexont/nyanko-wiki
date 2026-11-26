@@ -145,9 +145,9 @@ def ticket_gacha(D: str, maps: dict) -> tuple[dict, list, list]:
         return [[int(x) for x in l.split(",") if x.strip() and int(x) >= 0] for l in read(os.path.join(D, name))]
 
     ub = [l.split(",") for l in read(os.path.join(D, "unitbuy.csv"))]
-    item_rarity = [int(l.split(",")[0]) for l in read(os.path.join(D, "Gatyaitembuy.csv"))[1:] if l.strip()]
     medama = json.load(open(os.path.join(D, "EventGatyaMedamaItem.json"), encoding="utf-8"))["GatyaID"]
     gi = [l.split(",") for l in read(os.path.join(D, "Gatyaitembuy.csv"))[1:] if l.strip()]
+    item_rarity = [int(r[0]) for r in gi]
     XP_ITEMS = {i for i, r in enumerate(gi) if r[8].strip() == "6"}  # srcItemID 6 = XP
     names = json.load(open(os.path.join(SITE, "data", "stages", "index.json"), encoding="utf-8"))["items"]
 

@@ -65,10 +65,11 @@ export function renderNp(root) {
     const d = { ...d0,
       tickets: d0.tickets.map(t => t.f && once(t.map, t.i) ? { ...t, cat: t.f[0], rare: t.f[1], catTop: t.f[0], rareTop: t.f[1] } : t),
       gachaStages: d0.gachaStages.map(s => s.f && once(s.map, s.i) ? { ...s, t: s.f, top: undefined } : s) };
-    const now = Date.now();
-    const banners = gatyaBanners(sc, d.dupe, now);
     XP_ITEMS = d.xpItems || {};
     const draw = () => {
+      // 지금 시각은 그릴 때마다 다시 잰다 (탭을 오래 열어 두면 "지금 열림"이 어긋나지 않게)
+      const now = Date.now();
+      const banners = gatyaBanners(sc, d.dupe, now);
       // 레어 티켓은 가장 좋은 뽑기(울슈레·레전드 확률 2배)에 쓴다고 본다.
       // 어디에 쓰든 다른 방법과 비교한 상대 가치는 같아서, 고르는 칸 없이 하나로 고정 (사용자 결정)
       const rareRaw = pullNp(kindRates(RARE_BEST[2]), d.dupe);
@@ -244,7 +245,7 @@ function gatyaRows(banners, rareNp, dupe) {
     const sub = `레어 ${r[1]}% · 슈레 ${r[2]}% · 울슈레 ${r[3]}%${r[4] ? ` · 레전드 ${r[4]}%` : ""}`
       + (b.sure ? " · 11연 울슈레 확정 (11회 평균)" : "") + (b.open ? "" : ` · ${b.start.slice(5, 10).replace("-", "/")} 시작`);
     // 11연 확정이 있으면 11연 기준이 더 좋다 (통조림 1500 = 11회)
-    return { group: "gatya", name: b.name, sub, np: b.sure ? b.np11 : b.np, cans: b.price, open: b.open };
+    return { group: "gatya", name: b.name, sub, np: b.sure ? b.np11 : b.np, cans: b.sure ? b.price * 10 / 11 : b.price, open: b.open };
   });
   // 축제 등 뽑기 종류별 기준 확률 (지금 안 열려 있어도 비교할 수 있게)
   for (const [, name, r] of RARE_KINDS)

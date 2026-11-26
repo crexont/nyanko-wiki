@@ -21,6 +21,8 @@ function fmt(iso) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${WEEK[d.getUTCDay()]}) ${hm(d.getUTCHours() * 100 + d.getUTCMinutes())}`;
 }
 const period = e => `${fmt(e.start)} ~ ${e.end ? fmt(e.end) : "계속"}`;
+// 카드용: 좁은 칸에서 "~" 앞뒤로만 줄이 바뀌게
+const periodHtml = e => `<span class="sc-period"><span>${fmt(e.start)} ~</span> <span>${e.end ? fmt(e.end) : "계속"}</span></span>`;
 const gameVer = v => { const [a, b, c] = v.split(".").map(Number); return a * 10000 + b * 100 + c; };
 
 // 기간이 1년 넘게 열려 있으면 상시 (요일 스테이지·로그인 보너스 등)
@@ -160,14 +162,15 @@ export function renderSchedule(root) {
 }
 
 // ---- 카드 (목록·달력에서 고른 날짜·오늘) ----
-function card(r, top = "") {
+// today = 오늘 화면 (전부 지금 열린 것이라 "지금 열림"·달력 버튼은 뺀다. 시간대는 top 이 보여줌)
+function card(r, top = "", today = false) {
   const nc = newCats(r);
   // 뽑기는 없는 캐릭 수, 스테이지는 ★만 (드롭되는 없는 캐릭 이름은 마우스를 올리면)
   const badge = !nc.length ? "" : r.kind === "stage"
     ? `<span class="sc-newbadge" title="없는 캐릭 드롭: ${esc(nc.map(c => c.forms[0].name).join(", "))}">★</span>`
     : `<span class="sc-newbadge">★ 없는 캐릭 ${nc.length}</span>`;
   return `<div class="sc-item${r.open ? " open" : ""}${nc.length ? " has-new" : ""}">
-    <div class="sc-when">${top}<span>${period(r)}</span>${r.open ? `<span class="sc-open">지금 열림</span>` : ""}${badge}${r.kind === "stage" && !regular(r) ? pinBtn(r) : ""}</div>
+    <div class="sc-when">${top}${periodHtml(r)}${r.open && !today ? `<span class="sc-open">지금 열림</span>` : ""}${badge}${r.kind === "stage" && !regular(r) && !today ? pinBtn(r) : ""}</div>
     <div class="sc-main">${r.main()}</div></div>`;
 }
 
@@ -247,11 +250,16 @@ function todayView(shown, all, now) {
     ${ttLeft.map(ttRow).join("") || `<p class="sc-hint">오늘 남은 시간대가 없어요.</p>`}
     ${ttDone.length ? `<details><summary>오늘은 끝난 시간대 ${ttDone.length}개</summary>${ttDone.map(ttRow).join("")}</details>` : ""}
     </div></div>`;
-  return `<h3 class="sc-dayhead">지금 열린 일정 <small>${live.length}개 · 끝나는 순서</small></h3>`
-    + (live.length ? `<div class="sc-list">${live.map(r => card(r, top(r))).join("")}</div>` : `<div class="empty">지금 열린 기간 한정 일정이 없어요.</div>`)
+  // 지금 열린 일정은 종류별 패널로 (뽑기 → 스테이지 → 이벤트·보상), 안에서는 끝나는 순서
+  const liveHtml = Object.entries(KINDS).map(([k, title]) => {
+    const list = live.filter(r => r.kind === k);
+    return list.length ? `<div class="panel"><h2>${title} <span class="ctl">${list.length}개 · 끝나는 순서</span></h2><div class="sc-list">${list.map(r => card(r, top(r), true)).join("")}</div></div>` : "";
+  }).join("");
+  return `<h3 class="sc-dayhead">지금 열린 일정 <small>${live.length}개</small></h3>`
+    + (liveHtml || `<div class="empty">지금 열린 기간 한정 일정이 없어요.</div>`)
     + ttHtml
     + (soon.length ? `<h3 class="sc-dayhead">곧 시작 <small>7일 안</small></h3><div class="sc-list">${soon.map(r =>
-      card(r, `<span class="sc-left">${left(Date.parse(r.start) - now)} 뒤 시작</span>`)).join("")}</div>` : "");
+      card(r, `<span class="sc-left">${left(Date.parse(r.start) - now)} 뒤 시작</span>`, true)).join("")}</div>` : "");
 }
 
 // ---- 달력: 한 주에 한 줄, 기간은 날짜 칸을 가로지르는 막대 ----
@@ -357,8 +365,12 @@ function stageRows(list, maps, dropsByMap, now) {
     if (!known.length) return null;
     const other = e.maps.length - known.length;
     const cats = [...new Set(known.flatMap(m => [...(dropsByMap.get(m) || [])]))];
+    // 분류 이름은 줄마다 한 번만 (세계편 1장·2장… 처럼 한 분류 맵이 여러 개일 때 칩마다 반복되지 않게)
+    const byCat = new Map();
+    for (const m of known) { const c = maps.get(m).cat; byCat.set(c, [...(byCat.get(c) || []), m]); }
     const main = () => `
-        <div class="sc-maps">${known.map(m => `<a href="#/stage/${m}">${esc(maps.get(m).name)}<small>${esc(maps.get(m).cat)}</small></a>`).join("")}${other ? `<span class="sc-more">그 외 ${other}개</span>` : ""}</div>
+        ${[...byCat].map(([cat, ms]) => `<div class="sc-maps"><span class="sc-mapcat">${esc(cat)}</span>${ms.map(m => `<a href="#/stage/${m}">${esc(maps.get(m).name)}</a>`).join("")}</div>`).join("")}
+        ${other ? `<span class="sc-more">그 외 ${other}개</span>` : ""}
         ${e.rules ? `<p class="sc-rule">${e.rules.map(ruleText).filter(Boolean).map(esc).join(" / ")}</p>` : ""}`;
     return { kind: "stage", start: e.start, end: e.end, rules: e.rules, label: maps.get(known[0]).name, cnt: known.length, maps: known,
              cats, open: openNow(e, now), href: `#/stage/${known[0]}`, main };
