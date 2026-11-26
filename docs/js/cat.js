@@ -25,7 +25,7 @@ const STEP_NAME = { tf: "3진", ff: "4진" };
 // 게임과 같은 반올림·버림 순서를 위해 BCU(util/unit/UnitLevel.getMult, battle/entity/Entity, AtkModelEntity)를
 // 그대로 따른다. 레벨 배율은 Java float(32비트)로 계산되므로 Math.fround로 맞춘다.
 const f32 = Math.fround;
-function levelMult(curve, total) {
+export function levelMult(curve, total) {
   let dec = total, d = f32(1 - f32((curve[0] ?? 0) * f32(0.01)));
   for (const mul of curve) {
     if (dec >= 10) { d = f32(d + f32(mul * f32(0.1))); dec -= 10; }
@@ -58,9 +58,9 @@ function orbSlotHtml(i, cond, sel) {
   </div>`;
 }
 // 체력: trunc( trunc( round(기본×레벨) × 보물 ) × 본능 )
-const calcHp = (base, mult, talentPct) => Math.trunc(Math.trunc(f32(Math.round(f32(base * mult)) * TREASURE)) * (1 + talentPct * 0.01));
+export const calcHp = (base, mult, talentPct) => Math.trunc(Math.trunc(f32(Math.round(f32(base * mult)) * TREASURE)) * (1 + talentPct * 0.01));
 // 공격력(한 타): trunc( 본능 × trunc( round(기본×레벨) × 보물 ) )
-const calcAtk = (base, mult, talentPct) => Math.trunc((1 + talentPct * 0.01) * Math.trunc(f32(Math.round(f32(base * mult)) * TREASURE)));
+export const calcAtk = (base, mult, talentPct) => Math.trunc((1 + talentPct * 0.01) * Math.trunc(f32(Math.round(f32(base * mult)) * TREASURE)));
 
 // 능력 문장. 적 상세(enemy.js)도 같이 쓴다 (적 전용 능력은 아래쪽)
 export function abilityText(a, traits) {

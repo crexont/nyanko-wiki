@@ -3,7 +3,7 @@
 GatyaDataSetR1.csv: 줄 번호 = 이벤트 데이터(gatya.tsv)의 세트 번호, 줄 = 캐릭 ID 목록 (-1 로 끝남).
 GatyaData_Option_SetR.tsv 의 CharaID = 배너 대표 캐릭 (콜라보 캐릭은 세트 목록에 없고 여기에만 있기도 하다).
 노말·이벤트 뽑기(N1·E1)는 지금 일정에 나오는 세트가 전부 아이템 뽑기라 캐릭이 없어서 안 넣는다.
-사용: python tools/build_gatya_sets.py [--version 15.6.0] → docs/data/gatya_sets.json
+사용: python tools/build_gatya_sets.py [--version 버전 (기본: docs/gamedata.js 버전)] → docs/data/gatya_sets.json
 """
 from __future__ import annotations
 

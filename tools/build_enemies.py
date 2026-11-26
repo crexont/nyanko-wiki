@@ -6,7 +6,7 @@
 - 아이콘·공격 모션: build_gamedata.py 와 같은 팩 (enemy_icon_NNN.png, NNN_e02.maanim)
 
 출력: docs/data/enemies.json, docs/icons/enemy/<id>.png
-사용: python tools/extract_vhdx.py --with-packs → python tools/build_enemies.py [--version 15.6.0]
+사용: python tools/extract_vhdx.py --with-packs → python tools/build_enemies.py [--version 버전 (기본: docs/gamedata.js 버전)]
 """
 from __future__ import annotations
 

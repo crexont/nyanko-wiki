@@ -79,6 +79,14 @@ def reupload(raw: bytes, password: str) -> tuple[str, str]:
     return payload["transferCode"], payload["pin"]
 
 
+def forget_password(backup: str) -> None:
+    """다시 올리기에 성공하면 평문 비밀번호(.auth.json)는 더 필요 없다. 폴더를 남에게 줘도 계정이 안 새게 지운다 (.sav 는 남김)."""
+    try:
+        os.remove(backup + ".auth.json")
+    except OSError:
+        pass
+
+
 def save_codes(code: str, pin: str) -> str | None:
     """창을 닫아도 남도록 CODES_TXT 에 덧붙인다 (맨 아래가 최신). 실패하면 None."""
     try:
@@ -120,6 +128,7 @@ def main(argv: list[str] | None = None) -> None:
         with open(args.retry + ".auth.json", encoding="utf-8") as f:
             password = json.load(f)["password"]
         show_codes(*reupload(raw, password))
+        forget_password(args.retry)
         return
 
     if not args.code or not args.pin:
@@ -154,6 +163,7 @@ def main(argv: list[str] | None = None) -> None:
         print(f"\n{e}. 아래 명령으로 다시 시도해 주세요 (세이브는 백업에 그대로 있어요):")
         print(f'  NyankoWiki.exe --retry "{backup}"' if FROZEN else f'  python tools/transfer.py --retry "{backup}"')
         sys.exit(1)
+    forget_password(backup)
     show_codes(code, pin)
 
 

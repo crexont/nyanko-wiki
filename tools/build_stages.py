@@ -8,7 +8,7 @@
 
 출력: docs/data/stages/index.json (분류·맵 목록), docs/data/stages/<코드>.json (분류별 스테이지),
       docs/icons/items/<아이템 ID>.png (드롭 아이템 아이콘 추가)
-사용: python tools/build_stages.py [--version 15.6.0]
+사용: python tools/build_stages.py [--version 버전 (기본: docs/gamedata.js 버전)]
 """
 from __future__ import annotations
 

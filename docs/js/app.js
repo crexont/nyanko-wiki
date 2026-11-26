@@ -125,23 +125,26 @@ function bindHomeSearch(root) {
 
 function route() {
   const h = location.hash || "#/";
+  // 페이지마다 새 상자에 그린다: 데이터를 받는 동안 다른 페이지로 가면, 늦게 끝난 옛 페이지는 떼어 낸 상자에 그려져 화면을 덮지 않는다
+  const page = document.createElement("div");
+  main.replaceChildren(page);
   const cat = h.match(/^#\/cat\/(\d+)/);
   const enemy = h.match(/^#\/enemy\/(\d+)/);
   const stage = h.match(/^#\/stage\/(\d+)(?:\/(\d+))?/);
   const item = h.match(/^#\/item\/(\d+)/);
-  if (cat) refresh = renderCat(main, +cat[1]);
-  else if (item) refresh = renderItem(main, +item[1]);
-  else if (h.startsWith("#/items")) refresh = renderItems(main);
-  else if (enemy) refresh = renderEnemy(main, +enemy[1]);
-  else if (stage) refresh = stage[2] != null ? renderStage(main, +stage[1], +stage[2]) : renderMap(main, +stage[1]);
-  else if (h.startsWith("#/stages")) refresh = renderStages(main);
-  else if (h.startsWith("#/enemies")) refresh = renderEnemies(main);
-  else if (h.startsWith("#/cats")) refresh = renderCats(main);
-  else if (h.startsWith("#/dex")) refresh = renderDex(main);
-  else if (h.startsWith("#/plan")) refresh = renderPlan(main);
-  else if (h.startsWith("#/schedule")) refresh = renderSchedule(main);
-  else if (h.startsWith("#/np")) refresh = renderNp(main);
-  else { renderHome(main); refresh = null; }
+  if (cat) refresh = renderCat(page, +cat[1]);
+  else if (item) refresh = renderItem(page, +item[1]);
+  else if (h.startsWith("#/items")) refresh = renderItems(page);
+  else if (enemy) refresh = renderEnemy(page, +enemy[1]);
+  else if (stage) refresh = stage[2] != null ? renderStage(page, +stage[1], +stage[2]) : renderMap(page, +stage[1]);
+  else if (h.startsWith("#/stages")) refresh = renderStages(page);
+  else if (h.startsWith("#/enemies")) refresh = renderEnemies(page);
+  else if (h.startsWith("#/cats")) refresh = renderCats(page);
+  else if (h.startsWith("#/dex")) refresh = renderDex(page);
+  else if (h.startsWith("#/plan")) refresh = renderPlan(page);
+  else if (h.startsWith("#/schedule")) refresh = renderSchedule(page);
+  else if (h.startsWith("#/np")) refresh = renderNp(page);
+  else { renderHome(page); refresh = null; }
   document.querySelectorAll(".nav a").forEach(a =>
     a.toggleAttribute("aria-current", NAV.find(n => n.href === a.getAttribute("href"))?.match.test(h)));
   document.querySelectorAll(".nav a[aria-current]").forEach(a => a.setAttribute("aria-current", "page"));

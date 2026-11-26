@@ -8,7 +8,7 @@
 - 고양이 드링크 A 값: itemShopData.tsv (가격 ÷ 개수)
 
 출력: docs/data/np.json
-사용: python tools/build_np.py [--version 15.6.0]
+사용: python tools/build_np.py [--version 버전 (기본: docs/gamedata.js 버전)]
 """
 from __future__ import annotations
 

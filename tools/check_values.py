@@ -1,5 +1,5 @@
 """빌드한 데이터가 손으로 확인한 값과 맞는지 검사한다 (update_gamedata 마지막 단계, 따로 실행해도 됨).
-게임 업데이트로 값이 진짜 바뀌었으면 여기 숫자를 고친다. 캐릭 스탯(cat.js)·NP 순위(np.js)는 사이트 JS 계산이라 여기선 못 본다.
+게임 업데이트로 값이 진짜 바뀌었으면 여기 숫자를 고친다. 캐릭 스탯(cat.js)은 node 가 있으면 check_stats.mjs 로 같이 본다.
 
 사용: python tools/check_values.py
 """
@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 
 from common import ROOT
 
@@ -37,6 +39,14 @@ def main() -> None:
     # 마왕의 유혹: 클리어 XP × 4.7(보너스) × 1.5(고양이 박사) × 2(광고) + 레이더 확정 = 5,993,600 (사용자 실측과 일치)
     row = next((r for r in items["drops"]["6"] if r[:2] == [1319, 2]), None)
     check("마왕의 유혹 XP (레이더·박사·광고)", row and int(row[7] * 4.7 * 1.5 * 2) + row[9], 5_993_600)
+
+    node = shutil.which("node")
+    if node:
+        r = subprocess.run([node, os.path.join(ROOT, "tools", "check_stats.mjs")], capture_output=True, text=True, encoding="utf-8")
+        if r.returncode:
+            bad.append("캐릭 스탯: " + (r.stderr or r.stdout).strip())
+    else:
+        print("node 가 없어서 캐릭 스탯 검사(check_stats.mjs)는 건너뜀")
 
     if bad:
         raise SystemExit("확인한 값과 다름:\n  " + "\n  ".join(bad))

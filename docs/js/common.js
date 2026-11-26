@@ -53,7 +53,7 @@ export const store = {
   changed() { this.listeners.forEach(fn => fn()); },
 };
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.cats) { if (d.plan) d.plan = cleanPlan(d.plan); return d; } } catch {}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.cats) { if (d.plan) d.plan = cleanPlan(d.plan); if (d.orbEquip) d.orbEquip = cleanOrbs(d.orbEquip); if (d.inv) d.inv = cleanInv(d.inv); return d; } } catch {}
   return null;
 }
 // 육성 계획은 파일·저장소에서 오는 값이라 거른다 (to가 10억이면 레벨 비용 계산이 멈춤)
@@ -66,14 +66,31 @@ function cleanPlan(list) {
 }
 
 // 세이브 JSON의 재화·재료 → inv. 추출 도구는 세이브 순서 그대로 내보내므로 gamedata의 순서표로 아이템 ID를 붙인다.
+// 파일 값은 화면 HTML에 들어가니 전부 0 이상 정수로 바꾼다 (글자가 섞이면 스크립트가 실행될 수 있음)
+// (function 선언: 모듈 맨 위 store 가 load() 할 때 이미 쓸 수 있어야 함)
+function count(v) { return Math.max(0, Math.floor(Number(v)) || 0); }
+function counts(o) { return Object.fromEntries(Object.entries(o && typeof o === "object" ? o : {}).map(([k, v]) => [k, count(v)])); }
+function str(v) { return v == null ? undefined : String(v); }
+function cleanInv(i) {
+  return { currency: counts(i.currency), items: counts(i.items), orbs: counts(i.orbs), saveModified: str(i.saveModified), updatedAt: str(i.updatedAt) };
+}
 function invFromSave(d) {
-  if (d.inv) return { ...d.inv };  // 냥코위키에서 내보낸 파일
+  if (d.inv) return cleanInv(d.inv);  // 냥코위키에서 내보낸 파일
   if (!d.currency && !d.catfruit) return null;  // v1.0 추출 도구로 만든 파일
   const items = {};
-  (d.catfruit || []).forEach((n, i) => { const m = GD.matatabi?.[i]; if (m) items[m[0]] = n | 0; });
-  (d.catseyes || []).forEach((n, i) => { const id = GD.catseyes?.[i]; if (id != null) items[id] = n | 0; });
-  return { currency: { ...(d.currency || { xp: d.xp, catfood: d.catfood }) }, items, orbs: { ...(d.orbs || {}) },
-           saveModified: d.saveModified };
+  (Array.isArray(d.catfruit) ? d.catfruit : []).forEach((n, i) => { const m = GD.matatabi?.[i]; if (m) items[m[0]] = count(n); });
+  (Array.isArray(d.catseyes) ? d.catseyes : []).forEach((n, i) => { const id = GD.catseyes?.[i]; if (id != null) items[id] = count(n); });
+  return { currency: counts(d.currency || { xp: d.xp, catfood: d.catfood }), items, orbs: counts(d.orbs),
+           saveModified: str(d.saveModified) };
+}
+// 본능옥 장착: 캐릭마다 슬롯 배열, 칸은 null 또는 [종류, 대상 속성, 등급 0~4] 중 게임에 있는 조합만
+function cleanOrbs(src) {
+  const out = {};
+  for (const [id, slots] of Object.entries(src && typeof src === "object" ? src : {})) {
+    if (!BYID.has(+id) || !Array.isArray(slots)) continue;
+    out[id] = slots.map(s => Array.isArray(s) && GD.orbs?.list?.some(o => o[0] === s[0] && o[1] === s[1]) && [0, 1, 2, 3, 4].includes(s[2]) ? [s[0], s[1], s[2]] : null);
+  }
+  return out;
 }
 
 // 버튼 몇 개짜리 선택 창. 고른 값(취소면 null)을 돌려준다.
@@ -115,9 +132,9 @@ export async function importJson(text) {
   }
   // 육성 계획·본능옥 선택은 세이브에 없는 내 입력이라, 파일에 없으면 지금 것을 유지
   const plan = Array.isArray(d.plan) ? cleanPlan(d.plan) : (store.data?.plan || []);
-  const orbEquip = d.orbEquip || store.data?.orbEquip || {};
-  store.data = { meta: { source: d.source || "불러온 파일", saveModified: d.saveModified, gameVersion: d.gameVersion,
-                         catfood: d.catfood, importedAt: new Date().toISOString() }, cats, plan, orbEquip };
+  const orbEquip = d.orbEquip ? cleanOrbs(d.orbEquip) : (store.data?.orbEquip || {});
+  store.data = { meta: { source: str(d.source) || "불러온 파일", saveModified: str(d.saveModified), gameVersion: str(d.gameVersion),
+                         catfood: count(d.catfood), importedAt: new Date().toISOString() }, cats, plan, orbEquip };
   if (inv) store.data.inv = { ...inv, updatedAt: new Date().toISOString() };
   store.persist();
   toast(`${Object.keys(cats).length}마리${inv ? "와 재화·재료" : ""}를 불러왔어요.`);

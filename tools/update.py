@@ -61,9 +61,13 @@ def main() -> None:
     if mode == "2":
         code = args.code or input("이어하기 코드: ").strip()
         pin = args.pin or input("인증번호: ").strip()
+        before = os.path.getmtime(OUT) if os.path.exists(OUT) else None
         transfer.main([code, pin])  # 냥코_세이브.json 을 만들고 새 코드를 보여준다
         if FROZEN:
             input("새 이어하기 코드를 확인했으면 엔터를 누르세요 (이어하기_코드.txt 에도 있어요)...")
+        # 취소했거나 세이브를 못 읽었으면 예전 파일이 그대로라, 그걸 새 것처럼 보여주지 않는다
+        if not os.path.exists(OUT) or os.path.getmtime(OUT) == before:
+            sys.exit("새 세이브 파일을 만들지 못했어요 (취소했거나 세이브를 읽지 못함). 사이트는 열지 않아요.")
     else:
         if not args.no_extract:
             log("[1/2] 블루스택에서 세이브 추출")

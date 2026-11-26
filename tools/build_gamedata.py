@@ -6,7 +6,7 @@
 - 아이템 아이콘: ImageLocal.pack(APK) + *ImageServer.pack 의 gatyaitemD_<아이템 ID>_f.png
 
 출력: docs/gamedata.js (window.GAMEDATA), docs/icons/<id>_<form>.png, docs/icons/items/<아이템 ID>.png  (GitHub Pages 사이트용, 커밋한다)
-사용: python tools/extract_vhdx.py --with-packs → python tools/build_gamedata.py [--version 15.6.0]
+사용: python tools/extract_vhdx.py --with-packs → python tools/build_gamedata.py [--version 버전 (기본: docs/gamedata.js 버전)]
       → build_enemies.py → build_stages.py (docs/icons 를 새로 만들어서 적·드롭 아이콘도 다시 뽑아야 한다)
 """
 from __future__ import annotations
